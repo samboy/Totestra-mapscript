@@ -293,6 +293,7 @@ class MapConstants :
         self.serviceFlags = 0 # Used for concise description of flags
 	self.xtraFlags = 0 # We're running out of bits :(
 	self.AllowPangeas = False
+	self.serviceString = "MP No Tag" # No cheating in multiplayer!
         return
     def initialize(self):
         print "Initializing map constants"
