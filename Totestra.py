@@ -616,6 +616,14 @@ class MapConstants :
         clim = mmap.getClimate() 
         if clim == 1: # Tropical
             self.tropicsLatitude = 46
+            # q3max changes
+            self.DesertPercent = .10 # added
+            self.PlainsPercent = .30 # added
+            self.SnowTemp = .20 # added
+            self.TundraTemp = .30 # added
+            self.ForestTemp = .35 # added
+            self.JungleTemp = .50 # added
+            # End q3max changes
 	    self.iceSlope = 0.33 # Less ice
         elif clim == 2: # Arid
             self.DesertPercent = 0.40
