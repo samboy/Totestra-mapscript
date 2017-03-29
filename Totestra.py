@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120524 (May 24, 2012)
+## File: Totestra.py version 20120526 (May 26, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,10 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120526:
+## 1) En Dotter feature request: It's now possible to change how the map
+##    distributes resources
 ##
 ## 20120524:
 ## 1) New civ placement option: Have all civs placed on the same continent
@@ -209,15 +213,16 @@ import time
 import os
 
 # Options
-OPTION_MapSeed = 0 
-OPTION_NewWorld = 1
-OPTION_Pangaea = 2
-OPTION_Wrap = 3
-OPTION_IslandFactor = 4
-OPTION_Patience = 5
-OPTION_MapRatio = 6
+OPTION_MapSeed = 8 
+OPTION_NewWorld = 0
+OPTION_Pangaea = 1
+OPTION_Wrap = 2
+OPTION_IslandFactor = 3
+OPTION_Patience = 4
+OPTION_MapRatio = 5
+OPTION_MapResources = 6
 OPTION_Handicap = 7
-OPTION_MAX = OPTION_Handicap + 1 # Add 1 because it's 1-indexed
+OPTION_MAX = OPTION_MapSeed + 1 # Add 1 because it's 1-indexed
 
 # Setting this to 1 will allow the buggy 1:2 ratio; this ratio has
 # problems because of limitations in Civ 4's engine.  You have been warned.
@@ -259,11 +264,6 @@ class MapConstants :
         #use a value between 0.0 and 1.0
         self.MaxTreeChance = 1.0
 
-        #This variable adjusts the amount of bonuses on the map. Values above 1.0 will add bonus
-        #bonuses. People often want lots of bonuses, and for those people, this variable is definately
-        #a bonus.
-        self.BonusBonus = 1.0
-        
         #How many squares are added to a lake for each unit of drainage flowing
         #into it.
         self.LakeSizePerDrainage = 14.0
@@ -718,6 +718,23 @@ class MapConstants :
         self.EmperorBonus = handicap 
         self.ImmortalBonus = handicap 
         self.DeityBonus = handicap 
+       
+	# Now that we have calculated the player's bonus resources, how many
+	# resources should the map as a whole have? 
+
+        #This variable adjusts the amount of bonuses on the map. Values above 1.0 will add bonus
+        #bonuses. People often want lots of bonuses, and for those people, this variable is definately
+        #a bonus.
+        self.BonusBonus = 1.0
+	self.spreadResources = False 
+	bonus_add = mmap.getCustomMapOption(OPTION_MapResources)
+	if bonus_add == 1: # More evenly spread out
+		self.BonusBonus = 0.7 # Compensate for spread's increase
+		self.spreadResources = True # Increases resources
+	if bonus_add == 2: # Full of resources
+		self.BonusBonus = 1.5 # Increases resources
+		self.spreadResources = True # Increases resources more
+	self.xtraFlags |= ((bonus_add & 3) << 2)
         
         #After generating the heightmap, bands of ocean can be added to the map
         #to allow a more consistent climate generation. These bands are useful
@@ -786,6 +803,8 @@ class MapConstants :
             #self.hmHeight = 97
             #heightmap_size_factor = 3
             #self.AllowPangeas = False
+	elif selectionID == 4: # En Dotter
+            self.totestra = 0x8f3d2735334af # En Dotter's low on resources map 
 
         #Number of tectonic plates
         self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
@@ -3996,8 +4015,7 @@ class BonusPlacer :
             if len(placementList) > 0:
                 placementList = ShuffleList(placementList)
                 for eBonus in placementList:
-                    self.AddBonusType(eBonus,plotIndexList)                        
-                
+                    self.AddBonusType(eBonus,plotIndexList) 
 
         #now check to see that all resources have been placed at least once, this
         #pass ignoring area rules
@@ -4278,7 +4296,8 @@ class BonusPlacer :
         if plot.isPotentialCityWork() == False:
             return False
         
-        if bIgnoreArea == False and bonusInfo.isOneArea() == True:
+        if (bIgnoreArea == False and bonusInfo.isOneArea() == True and
+		mc.spreadResources == False):
             areaID = plot.getArea()
             areaFound = False
             for i in range(len(self.bonusList)):
@@ -5356,6 +5375,8 @@ def getCustomMapOptionName(argsList):
             return "Map ratio"
         elif optionID == OPTION_Handicap:
             return "Player bonus resources"
+	elif optionID == OPTION_MapResources:
+	    return "Map resources"
 
         return u""
 	
@@ -5373,7 +5394,7 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == OPTION_Wrap:
             return 3
         elif optionID == OPTION_MapSeed: # Map world
-            return 4
+            return 5
         elif optionID == OPTION_IslandFactor: # Number continents
             return 4
         elif optionID == OPTION_Patience: # Speed/quality tradeoff
@@ -5386,6 +5407,8 @@ def getNumCustomMapOptionValues(argsList):
                 return 6
         elif optionID == OPTION_Handicap:
 	    return 4
+	elif optionID == OPTION_MapResources:
+	    return 3
         return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -5425,6 +5448,8 @@ def getCustomMapOptionDescAt(argsList):
             return "Fixed #2 (Cephalo)"
         elif selectionID == 3:
             return "Fixed #3 (Caulixtla)"
+	elif selectionID == 4:
+	    return "Fixed #4 (En Dotter)"
     elif optionID == OPTION_IslandFactor:
         if selectionID == 0:
             return "Few (faster)"
@@ -5467,6 +5492,13 @@ def getCustomMapOptionDescAt(argsList):
 	    return "Some"
 	if selectionID == 3:
 	    return "Lots (Easier for player)"
+    elif optionID == OPTION_MapResources:
+	if selectionID == 0:
+	    return "Like Perfect World"
+	if selectionID == 1:
+	    return "Resources evenly spread"
+	if selectionID == 2:
+	    return "Full of resources"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
