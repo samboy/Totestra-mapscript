@@ -1,5 +1,6 @@
 ##############################################################################
-## File: Totestra.py version 20120530 (May 30, 2012)
+## File: Totestra.py version 20120603 (June 3, 2012)
+## Note: This is a finished product.  
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +50,15 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120603:
+## 1) The chance of a large continent splitting at the edge of the map
+##    has been greatly reduced
+## 2) There is now an option to remove coastal mountains and reduce inland
+##    mountains
+## 3) New map wrap option: PerfectWorld-compatible toric wrap
+## 4) All bits in the service tag are now used up.  I'm declaring Totestra
+##    finished.
 ##
 ## 20120530:
 ## 1) Added 2-bit "parity" to service tag
@@ -219,7 +229,7 @@ import time
 import os
 
 # Options
-OPTION_MapSeed = 8 
+OPTION_MapSeed = 10
 OPTION_NewWorld = 0
 OPTION_Pangaea = 1
 OPTION_Wrap = 2
@@ -228,6 +238,8 @@ OPTION_Patience = 4
 OPTION_MapRatio = 5
 OPTION_MapResources = 6
 OPTION_Handicap = 7
+OPTION_NoRotate = 8
+OPTION_SmoothPeaks = 9
 OPTION_MAX = OPTION_MapSeed + 1 # Add 1 because it's 1-indexed
 
 # Setting this to 1 will allow the buggy 1:2 ratio; this ratio has
@@ -276,6 +288,8 @@ class MapConstants :
         self.totestra = 0 
         self.hmWidth  = 0
         self.hmHeight = 0
+	self.noRotate = 0
+	self.smoothPeaks = 1
         self.serviceFlags = 0 # Used for concise description of flags
 	self.xtraFlags = 0 # We're running out of bits :(
 	self.AllowPangeas = False
@@ -648,8 +662,9 @@ class MapConstants :
         patience = mmap.getCustomMapOption(OPTION_Patience)
         patience += 1 # Patience at 0 is broken
 
+	# This allows me to have one final usable bit in the service tag
         self.serviceFlags <<= 3
-        self.serviceFlags |= (patience & 7) # 3 bits; total 10
+        self.serviceFlags |= (patience & 3) # 2 bits; total 10
 
         # The preset worlds have hard-coded values
         selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
@@ -769,7 +784,10 @@ class MapConstants :
 		self.BonusBonus = 1.5 # Increases resources
 		self.spreadResources = True # Increases resources more
 	self.xtraFlags |= ((bonus_add & 3) << 2)
-        
+       
+        self.noRotate = mmap.getCustomMapOption(OPTION_NoRotate)
+	self.smoothPeaks = mmap.getCustomMapOption(OPTION_SmoothPeaks)
+ 
         #After generating the heightmap, bands of ocean can be added to the map
         #to allow a more consistent climate generation. These bands are useful
         #if you are generating part of a world where the weather might be coming
@@ -786,10 +804,11 @@ class MapConstants :
         self.eastCrop = 0
         self.westCrop = 0
 
-        if selectionID == 1: #Toroidal
+        if selectionID == 1 or selectionID == 3: #Toroidal
             self.hmHeight -= 1
             self.WrapY = True
-            self.iceChance *= 0.1
+	    if selectionID == 1:
+                self.iceChance *= 0.1
             self.northWaterBand = 0
             self.northCrop = 0
             self.southWaterBand = 0
@@ -908,6 +927,10 @@ class PythonRandom :
 	    mc.serviceTag = (seedValue & 0xffffffffffffff)
 	    mc.serviceTag |= (mc.serviceFlags << 60)
 	    mc.serviceTag |= (mc.xtraFlags << 53)
+	    if(mc.noRotate == 0):
+		mc.serviceTag |= (1 << 83)
+	    if(mc.smoothPeaks == 1):
+		mc.serviceTag |= (1 << 75)
 	    mc.serviceTag |= (a91a15d7(mc.serviceTag) << 53)
 	    mc.serviceString = ("%x" % mc.serviceTag)
             print "SERVICE TAG: " + mc.serviceString 
@@ -1755,6 +1778,40 @@ class HeightMap :
 
         NormalizeMap(self.heightMap,mc.hmWidth,mc.hmHeight)
 
+    def rotateMap(self):
+
+	if mc.noRotate != 0:
+		return
+
+        # This rotates a map east or west so that the map wraps around where
+        # the lowest vertical band is on the map
+	low = 0
+	min = 10000.0
+
+	# Find the place on the map with the most water (lowest heightfield)
+        for x in range(mc.hmWidth):
+		sum = 0.0
+		for y in range(mc.hmHeight):
+			sum += self.heightMap[GetHmIndex(x,y)]
+		#print "for x %d sum is %f min %f" % (x,sum,min)
+		if(sum < min):
+			low = x
+			min = sum
+	#print "low x is %d" % (low) #DEBUG
+	
+	# Rotate the height map so we wrap where there is more water
+	for y in range(mc.hmHeight):
+		tempStripe = []
+		for x in range(mc.hmWidth):
+			tempStripe.append(self.heightMap[GetHmIndex(x,y)])
+		for x in range(mc.hmWidth):
+			self.heightMap[GetHmIndex(x,y)] = tempStripe[
+				((x + low) % mc.hmWidth)]
+
+	# Done
+	return
+
+
     def addWaterBands(self):
         #validate water bands. Maps that wrap cannot have one in that direction
         if mc.WrapX and (mc.eastWaterBand != 0 or mc.westWaterBand != 0):
@@ -2442,6 +2499,7 @@ class SmallMaps :
                     self.averageTempMap.append(0.0)
 
         #Smooth coasts so there are fewer hills on coast
+	# (This might make deep ocean difficult to implement)
         for y in range(mc.height):
             for x in range(mc.width):
                 if self.isBelowSeaLevel(x,y):
@@ -2561,7 +2619,7 @@ class SmallMaps :
         for y in range(mc.height):
             for x in range(mc.width):
                 i = GetIndex(x,y)
-                if self.plotMap == mc.HILLS:
+                if self.plotMap[i] == mc.HILLS and mc.smoothPeaks == 1:
                     allHills = True
                     for direction in range(1,9,1):
                         xx,yy = GetXYFromDirection(x,y,direction)
@@ -2570,15 +2628,26 @@ class SmallMaps :
                             allHills = False
                     if allHills == True:
                         self.plotMap[i] = mc.LAND
-                if self.plotMap == mc.PEAK:
+                if self.plotMap[i] == mc.PEAK and mc.smoothPeaks == 1:
                     allPeaks = True
+		    peakCount = 0
+		    nextToOcean = False
+		    #print "peak at %d %d" % (x,y) #DEBUG
+		    # While we're here, let's eliminate seaside peaks
                     for direction in range(1,9,1):
                         xx,yy = GetXYFromDirection(x,y,direction)
                         ii = GetIndex(xx,yy)
                         if self.plotMap[ii] != mc.PEAK:
                             allPeaks = False
-                    if allPeaks == True:
+			else:
+			    peakCount += 1
+                        if self.plotMap[ii] == mc.OCEAN:
+			    #print "nextToOcean %d %d" % (x,y) #DEBUG
+                            nextToOcean = True
+                    if allPeaks == True or peakCount > 3:
                         self.plotMap[i] = mc.HILLS
+		    if nextToOcean == True:
+			self.plotMap[i] = mc.HILLS
         
         return
     def createTerrainMap(self):
@@ -5414,6 +5483,10 @@ def getCustomMapOptionName(argsList):
             return "Player bonus resources"
 	elif optionID == OPTION_MapResources:
 	    return "Map resources"
+	elif optionID == OPTION_NoRotate:
+	    return "Wrap land"
+	elif optionID == OPTION_SmoothPeaks:
+	    return "Reduce Mountains"
 
         return u""
 	
@@ -5429,7 +5502,7 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == OPTION_Pangaea:
             return 2
         elif optionID == OPTION_Wrap:
-            return 3
+            return 4
         elif optionID == OPTION_MapSeed: # Map world
             return 6
         elif optionID == OPTION_IslandFactor: # Number continents
@@ -5446,6 +5519,10 @@ def getNumCustomMapOptionValues(argsList):
 	    return 4
 	elif optionID == OPTION_MapResources:
 	    return 3
+	elif optionID == OPTION_NoRotate:
+	    return 2
+	elif optionID == OPTION_SmoothPeaks:
+	    return 2
         return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -5476,6 +5553,8 @@ def getCustomMapOptionDescAt(argsList):
             return "Toroidal"
         elif selectionID == 2:
             return "Flat"
+	elif selectionID == 3:
+	    return "Toric w/ ice band"
     elif optionID == OPTION_MapSeed:
         if selectionID == 0:
             return "Random"
@@ -5538,6 +5617,16 @@ def getCustomMapOptionDescAt(argsList):
 	    return "Resources evenly spread"
 	if selectionID == 2:
 	    return "Full of resources"
+    elif optionID == OPTION_NoRotate:
+	if selectionID == 0:
+	    return "Fix continent split"
+	else:
+	    return "PerfectWorld style"
+    elif optionID == OPTION_SmoothPeaks:
+	if selectionID == 0:
+	    return "No"
+	else:
+	    return "Yes"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
@@ -5552,6 +5641,8 @@ def getCustomMapOptionDefault(argsList):
             return 1 # Slow speed/good quality (Mark's default)
 	elif argsList[0] == OPTION_MapRatio:
 	    return 2 # 3:2 Earthlike map
+	elif argsList[0] == OPTION_SmoothPeaks:
+	    return 1 # By default, smooth coastal and other peaks
         else: # Everything else defaults to first choice
             return 0
     
@@ -5639,6 +5730,7 @@ def getGridSize(argsList):
     return (sizex, sizey)
 
 def generatePlotTypes():
+    # Core height map generator
     gc = CyGlobalContext()
     mmap = gc.getMap()
     mc.width = mmap.getGridWidth()
@@ -5653,6 +5745,7 @@ def generatePlotTypes():
     pb.breakPangaeas()
 ##    hm.Erode()
 ##    hm.printHeightMap()
+    hm.rotateMap()
     hm.addWaterBands()
 ##    hm.printHeightMap()
     cm.createClimateMaps()
