@@ -49,6 +49,20 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120521:
+## 1) Overhaul of selection code; symbolic names are now used instead of
+##    numbers
+## 2) Map ratios now can be selected (within reason)
+##
+## 20120519:
+## 1) Extra-slow maps disabled; they just put PerfectWorld in to an 
+##    infinite loop
+## 2) "Fast and cheap" maps tested; they work with all three preset 
+##    seeds so I'm declaring these maps stable.
+## 3) Iceberg code overhaul: Polar icebergs are now more common in cold 
+##    and/or large maps, and less common in smaller and/or warmer maps.
+##
 ## 20120512:
 ## 1) Faster lower-quality maps now tweaked and fixed.  "fast and dirty" caps
 ##    the size: if you ask for huge you will get a medium sized map.
@@ -180,6 +194,20 @@ import math
 import sys
 import time
 import os
+
+# Options
+OPTION_MapSeed = 0 
+OPTION_NewWorld = 1
+OPTION_Pangaea = 2
+OPTION_Wrap = 3
+OPTION_IslandFactor = 4
+OPTION_Patience = 5
+OPTION_MapRatio = 6
+OPTION_MAX = OPTION_MapRatio + 1 # Add 1 because it's 1-indexed
+
+# Setting this to 1 will allow some more map ratios which have not been
+# fully tested.  This ratios may cause problems; you have been warned
+ALLOW_EXTREME_RATIOS = 0
 
 class MapConstants :
     def __init__(self):
@@ -547,20 +575,20 @@ class MapConstants :
 	    self.iceSlope = 0.87 # Lots of ice
         
         #New World Rules
-        selectionID = mmap.getCustomMapOption(1)
+        selectionID = mmap.getCustomMapOption(OPTION_NewWorld)
         if selectionID == 1:
             self.AllowNewWorld = not self.AllowNewWorld
         #Pangaea Rules
-        selectionID = mmap.getCustomMapOption(2)
+        selectionID = mmap.getCustomMapOption(OPTION_Pangaea)
         if selectionID == 1:
             self.AllowPangeas = not self.AllowPangeas
 
         # How long are they willing to wait for the map to be made
-        patience = mmap.getCustomMapOption(5)
+        patience = mmap.getCustomMapOption(OPTION_Patience)
         patience += 1 # Patience at 0 is broken
 
         # The preset worlds have hard-coded values
-        selectionID = mmap.getCustomMapOption(0)
+        selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
 
         # Disabled: we will only alter seed (it's now for debugging)
         #if selectionID != 0:
@@ -582,16 +610,37 @@ class MapConstants :
         # slower the map generation process
 
         # X and Y values for the map's aspect ratio
-        if(mmap.getCustomMapOption(0) == 0):
-            self.ratioX = mmap.getCustomMapOption(6) + 1
-        else:
-            self.ratioX = 1
-        if(self.ratioX < 1):
-            self.ratioX = 1
-        self.ratioX = 3 # DEBUG (we need to fix Ratio's bugs)
-        self.ratioY = 2
+	ratioValue = mmap.getCustomMapOption(OPTION_MapRatio)
+	if 1 == 2: # Dummy, does nothing, so we don't get elif problems
+		self.ratioX = 3
+		self.ratioY = 2
+        elif ratioValue == 0: # 2:3
+		self.ratioX = 2
+		self.ratioY = 3
+        elif ratioValue == 1: # 1:1
+		self.ratioX = 2
+		self.ratioY = 2
+	elif ratioValue == 2: # 3:2
+		self.ratioX = 3
+		self.ratioY = 2
+	elif ratioValue == 3: # 2:1
+		self.ratioX = 4
+		self.ratioY = 2
+        elif ratioValue == 4: # 1:2; down here because it's buggy
+		self.ratioX = 2
+		self.ratioY = 4
+	elif ratioValue == 5: # 7:1, Ringworld (untested)
+		self.ratioX = 7
+		self.ratioY = 1
+	elif ratioValue == 6: # 1:7, Vertical Ringworld (untested)
+		self.ratioX = 1
+		self.ratioY = 7
 
-        selectionID = mmap.getCustomMapOption(4)
+	if patience < 2:
+        	self.ratioX = 3 # One less thing to SQA
+        	self.ratioY = 2
+
+        selectionID = mmap.getCustomMapOption(OPTION_IslandFactor)
 
 	# If they want a fast map, don't allow them to select more islands
 	if(patience < 2):
@@ -608,7 +657,7 @@ class MapConstants :
         self.maxMapHeight = int(self.hmHeight / 4)
          
         #Wrap options
-        selectionID = mmap.getCustomMapOption(3)
+        selectionID = mmap.getCustomMapOption(OPTION_Wrap)
         wrapString = "Cylindrical"
 	self.WrapX = True
 	self.WrapY = False
@@ -644,7 +693,7 @@ class MapConstants :
             wrapString = "Flat"
        
         # Random seed options (fixed or random)
-        selectionID = mmap.getCustomMapOption(0)
+        selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
         mapRString = "Random"
         self.totestra = 0 
         if selectionID == 1: # Totestra
@@ -5220,7 +5269,7 @@ def getNumCustomMapOptions():
     Return an integer
     """
     mc.initialize()
-    return 6 # Map ratios disabled until I iron out the bugs
+    return OPTION_MAX
 	
 def getCustomMapOptionName(argsList):
         """
@@ -5229,19 +5278,19 @@ def getCustomMapOptionName(argsList):
         Return a Unicode string
         """
         optionID = argsList[0]
-        if optionID == 1:
+        if optionID == OPTION_NewWorld:
             return "New World Rule"
-        elif optionID == 2:
+        elif optionID == OPTION_Pangaea:
             return "Pangaea Rule"
-        elif optionID == 3:
+        elif optionID == OPTION_Wrap:
             return "Wrap Option"
-        elif optionID == 0:
+        elif optionID == OPTION_MapSeed:
             return "Map seed"
-        elif optionID == 4:
+        elif optionID == OPTION_IslandFactor:
             return "Continent amount"
-        elif optionID == 5:
+        elif optionID == OPTION_Patience:
             return "Patience amount"
-        elif optionID == 6:
+        elif optionID == OPTION_MapRatio:
             return "Map ratio"
 
         return u""
@@ -5253,21 +5302,24 @@ def getNumCustomMapOptionValues(argsList):
         Return an integer
         """
         optionID = argsList[0]
-        if optionID == 1:
+        if optionID == OPTION_NewWorld:
             return 2
-        elif optionID == 2:
+        elif optionID == OPTION_Pangaea:
             return 2
-        elif optionID == 3:
+        elif optionID == OPTION_Wrap:
             return 3
-        elif optionID == 0: # Map world
+        elif optionID == OPTION_MapSeed: # Map world
             return 4
-        elif optionID == 4: # Number continents
+        elif optionID == OPTION_IslandFactor: # Number continents
             return 4
-        elif optionID == 5: # Speed/quality tradeoff
+        elif optionID == OPTION_Patience: # Speed/quality tradeoff
 	    # Slow but good disabled: Causes infinite loops
             return 2
-        elif optionID == 6: # Map ratio
-            return 4
+        elif optionID == OPTION_MapRatio: # Map ratio
+	    if ALLOW_EXTREME_RATIOS == 1:
+	    	return 7 
+	    else:
+                return 4
         return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -5279,7 +5331,7 @@ def getCustomMapOptionDescAt(argsList):
     """
     optionID = argsList[0]
     selectionID = argsList[1]
-    if optionID == 1:
+    if optionID == OPTION_NewWorld:
         if selectionID == 0:
             if mc.AllowNewWorld:
                 return "Start in Old World"
@@ -5290,7 +5342,7 @@ def getCustomMapOptionDescAt(argsList):
                 return "Start Anywhere"
             else:
                 return "Start in Old World"
-    elif optionID == 2:
+    elif optionID == OPTION_Pangaea:
         if selectionID == 0:
             if mc.AllowPangeas:
                 return "Allow Pangaeas"
@@ -5301,14 +5353,14 @@ def getCustomMapOptionDescAt(argsList):
                 return "Break Pangaeas"
             else:
                 return "Allow Pangaeas"
-    elif optionID == 3:
+    elif optionID == OPTION_Wrap:
         if selectionID == 0:
             return "Cylindrical"
         elif selectionID == 1:
             return "Toroidal"
         elif selectionID == 2:
             return "Flat"
-    elif optionID == 0:
+    elif optionID == OPTION_MapSeed:
         if selectionID == 0:
             return "Random"
         elif selectionID == 1:
@@ -5317,7 +5369,7 @@ def getCustomMapOptionDescAt(argsList):
             return "Fixed #2 (Cephalo)"
         elif selectionID == 3:
             return "Fixed #3 (Caulixtla)"
-    elif optionID == 4:
+    elif optionID == OPTION_IslandFactor:
         if selectionID == 0:
             return "Few (faster)"
         elif selectionID == 1:
@@ -5326,7 +5378,7 @@ def getCustomMapOptionDescAt(argsList):
             return "Many"
         elif selectionID == 3:
             return "Lots (slow)"
-    elif optionID == 5:
+    elif optionID == OPTION_Patience:
         if selectionID == -1:
             return "Not very (Faster mapgen)"
         elif selectionID == 0:
@@ -5335,15 +5387,21 @@ def getCustomMapOptionDescAt(argsList):
             return "Somewhat"
         elif selectionID == 2:
             return "Extremely (nicer map)"
-    elif optionID == 6: # Map ratio
-        if selectionID == 0:
-            return "2:1 (tall map)"
-        elif selectionID == 1:
+    elif optionID == OPTION_MapRatio: # Map ratio
+        if selectionID == 0: 
+            return "2:3 (Tall map)" 
+        elif selectionID == 1: 
             return "1:1 (Square map)"
         elif selectionID == 2:
             return "3:2 (Earth-like)"
         elif selectionID == 3:
             return "2:1 (Wide map)"
+        elif selectionID == 4: 
+            return "1:2 (Very tall map)" 
+        elif selectionID == 5:
+            return "7:1 (Ringworld)"
+        elif selectionID == 6:
+            return "1:7 (Hula hoop)"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
@@ -5354,13 +5412,11 @@ def getCustomMapOptionDefault(argsList):
 	"""
 	#Always zero in this case
 	#print argsList[0]
-        if argsList[0] < 5:
-            return 0
-        elif argsList[0] == 5:
+        if argsList[0] == OPTION_Patience:
             return 1 # Slow speed/good quality (Mark's default)
-        elif argsList[0] == 6: # Map ratio
-            return 2 # 3:2 maps
-        else:
+	elif argsList[0] == OPTION_MapRatio:
+	    return 2 # 3:2 Earthlike map
+        else: # Everything else defaults to first choice
             return 0
     
 def isRandomCustomMapOption(argsList):
