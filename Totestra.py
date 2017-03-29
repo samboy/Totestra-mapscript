@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120603 (June 3, 2012)
+## File: Totestra.py version 20120612 (June 12, 2012)
 ## Note: This is a finished product.  
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
@@ -50,6 +50,9 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120612:
+## 1) Bugfix with rocky maps
 ##
 ## 20120603:
 ## 1) The chance of a large continent splitting at the edge of the map
@@ -293,7 +296,6 @@ class MapConstants :
         self.serviceFlags = 0 # Used for concise description of flags
 	self.xtraFlags = 0 # We're running out of bits :(
 	self.AllowPangeas = False
-	self.serviceString = "MP No Tag" # No cheating in multiplayer!
         return
     def initialize(self):
         print "Initializing map constants"
@@ -619,7 +621,7 @@ class MapConstants :
             self.PeakPercent = 0.24
             self.HillPercent = 0.70
             self.HillChanceAtOne = 0.70
-            self.PeakChanceAtOnce = 0.43
+            self.PeakChanceAtOne = 0.43
 	    self.iceSlope = 0.75 # Some more ice
             self.iceRange = 6
         elif clim == 4: # Cold
@@ -860,7 +862,7 @@ class MapConstants :
 	elif selectionID == 4: # En Dotter 1
             self.totestra = 0x8f3d2735334af # En Dotter's low on resources map 
 	elif selectionID == 5:
-	    self.totestra = 0x4eceb2bbd8853 # En Dotter's nearby starts map
+	    self.totestra = 0x1fcdc6f76b8c1b# En Dotter's nearby starts map
 
         #Number of tectonic plates
         self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
