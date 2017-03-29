@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120612 (June 12, 2012)
+## File: Totestra.py version 20120615 (June 15, 2012)
 ## Note: This is a finished product.  
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
@@ -50,6 +50,9 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120615:
+## 1) One-line bugfix for multi-player maps
 ##
 ## 20120612:
 ## 1) Bugfix with rocky maps
@@ -296,6 +299,7 @@ class MapConstants :
         self.serviceFlags = 0 # Used for concise description of flags
 	self.xtraFlags = 0 # We're running out of bits :(
 	self.AllowPangeas = False
+	self.serviceString = "MP No Tag" # No cheating in multiplayer!
         return
     def initialize(self):
         print "Initializing map constants"
