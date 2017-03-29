@@ -465,7 +465,6 @@ class MapConstants :
             seaLevel = int(mmap.getSeaLevel())
         except:
             seaLevel = 1
-        #Percent of land vs. water
         self.landPercent = 0.29
         if seaLevel == 0:
             self.landPercent = 0.43
@@ -519,23 +518,33 @@ class MapConstants :
         self.JungleTemp = .7
 
         # Temperate: 0 Tropical: 1 Arid: 2 Rocky: 3 Cold: 4
+        self.iceChance = 1.0 # Chance of having iceberg at top/bottom of map
+        self.iceRange = 4 # Number of squares we add icebergs to
+        self.iceSlope = 0.66 # How quickly we reduce icebergs
         clim = mmap.getClimate() 
         if clim == 1: # Tropical
             self.tropicsLatitude = 46
+	    self.iceSlope = 0.33 # Less ice
         elif clim == 2: # Arid
             self.DesertPercent = 0.40
             self.PlainsPercent = 0.82
+	    self.iceSlope = 0.33 # Less ice
         elif clim == 3: # Rocky
             self.PeakPercent = 0.24
             self.HillPercent = 0.70
             self.HillChanceAtOne = 0.70
             self.PeakChanceAtOnce = 0.43
+	    self.iceSlope = 0.75 # Some more ice
+            self.iceRange = 6
         elif clim == 4: # Cold
             self.tropicsLatitude = 0
             self.SnowTemp = .50
             self.TundraTemp = .75
             self.ForestTemp = .85
             self.JungleTemp = .99
+            self.iceRange = 12
+            self.iceChance = 1.2
+	    self.iceSlope = 0.87 # Lots of ice
         
         #New World Rules
         selectionID = mmap.getCustomMapOption(1)
@@ -552,10 +561,12 @@ class MapConstants :
 
         # The preset worlds have hard-coded values
         selectionID = mmap.getCustomMapOption(0)
-        if selectionID != 0:
-            patience = 2
-            if selectionID != 3:
-                self.landPercent = 0.29 # We will force this here too
+
+        # Disabled: we will only alter seed (it's now for debugging)
+        #if selectionID != 0:
+            #patience = 2
+            #if selectionID != 3:
+            #    self.landPercent = 0.29 # We will force this here too
 
         self.patience = patience
         #Size of largest map increment to begin midpoint displacement. Must
@@ -581,6 +592,11 @@ class MapConstants :
         self.ratioY = 2
 
         selectionID = mmap.getCustomMapOption(4)
+
+	# If they want a fast map, don't allow them to select more islands
+	if(patience < 2):
+		selectionID = 0
+
         heightmap_size_factor = 3 + selectionID
         self.hmWidth  = (self.hmMaxGrain * self.ratioX * 
                          heightmap_size_factor)
@@ -616,6 +632,7 @@ class MapConstants :
         if selectionID == 1: #Toroidal
             self.hmHeight -= 1
             self.WrapY = True
+            self.iceChance *= 0.1
             self.northWaterBand = 0
             self.northCrop = 0
             self.southWaterBand = 0
@@ -631,38 +648,38 @@ class MapConstants :
         mapRString = "Random"
         self.totestra = 0 
         if selectionID == 1: # Totestra
-            self.totestra = 8885098498360902
-            mapRstring = "Totestra"
+            self.totestra = 8885098498360902 # Fixed map seed
+            #mapRstring = "Totestra"
             # Ignore most map parameters
-            self.wrapX = True
-            self.wrapY = False
-            wrapString = "Cylindrical"
-            self.hmWidth = 240
-            self.hmHeight = 161
-            heightmap_size_factor = 5
-            self.AllowPangeas = False
+            #self.wrapX = True
+            #self.wrapY = False
+            #wrapString = "Cylindrical"
+            #self.hmWidth = 240
+            #self.hmHeight = 161
+            #heightmap_size_factor = 5
+            #self.AllowPangeas = False
         elif selectionID == 2: # Cephalo
-            self.totestra = 4316490043753041
-            mapRstring = "Cephalo"
+            self.totestra = 4316490043753041 # Fixed map seed
+            #mapRstring = "Cephalo"
             # Ignore most map parameters
-            self.wrapX = True
-            self.wrapY = False
-            wrapString = "Cylindrical"
-            self.hmWidth = 144
-            self.hmHeight = 97
-            heightmap_size_factor = 3
-            self.AllowPangeas = False
+            #self.wrapX = True
+            #self.wrapY = False
+            #wrapString = "Cylindrical"
+            #self.hmWidth = 144
+            #self.hmHeight = 97
+            #heightmap_size_factor = 3
+            #self.AllowPangeas = False
         elif selectionID == 3: # Caulixtla
-            self.totestra = 8939185639133313
-            mapRstring = "Caulixtla"
+            self.totestra = 8939185639133313 # Fixed map seed
+            #mapRstring = "Caulixtla"
             # Ignore most map parameters
-            self.wrapX = True
-            self.wrapY = False
-            wrapString = "Cylindrical"
-            self.hmWidth = 144
-            self.hmHeight = 97
-            heightmap_size_factor = 3
-            self.AllowPangeas = False
+            #self.wrapX = True
+            #self.wrapY = False
+            #wrapString = "Cylindrical"
+            #self.hmWidth = 144
+            #self.hmHeight = 97
+            #heightmap_size_factor = 3
+            #self.AllowPangeas = False
 
         #Number of tectonic plates
         self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
@@ -698,7 +715,7 @@ class MapConstants :
         self.optionsString += "RatioY = " + str(self.ratioY) + "\n"
         self.optionsString += "Climate = " + str(clim) + "\n"
         self.optionsString += "Patience = " + str(patience) + "\n"
-        self.optionsString += "Number continents = " + str(heightmap_size_factor) +"\n" 
+        self.optionsString += "Island factor = " + str(heightmap_size_factor) +"\n" 
 
         print str(self.optionsString) + "\n" 
         return
@@ -5219,7 +5236,7 @@ def getCustomMapOptionName(argsList):
         elif optionID == 3:
             return "Wrap Option"
         elif optionID == 0:
-            return "Map world"
+            return "Map seed"
         elif optionID == 4:
             return "Continent amount"
         elif optionID == 5:
@@ -5247,7 +5264,8 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == 4: # Number continents
             return 4
         elif optionID == 5: # Speed/quality tradeoff
-            return 3
+	    # Slow but good disabled: Causes infinite loops
+            return 2
         elif optionID == 6: # Map ratio
             return 4
         return 0
@@ -5294,11 +5312,11 @@ def getCustomMapOptionDescAt(argsList):
         if selectionID == 0:
             return "Random"
         elif selectionID == 1:
-            return "Totestra"
+            return "Fixed #1 (Totestra)"
         if selectionID == 2:
-            return "Cephalo"
+            return "Fixed #2 (Cephalo)"
         elif selectionID == 3:
-            return "Caulixtla"
+            return "Fixed #3 (Caulixtla)"
     elif optionID == 4:
         if selectionID == 0:
             return "Few (faster)"
@@ -5411,6 +5429,12 @@ def getGridSize(argsList):
     base_size = float(sizey) / 2 # base sizes: 3.5, 5, 6.5, 8, 10, 12
     sizex = int((base_size * mc.ratioX) + 0.5)
     sizey = int((base_size * mc.ratioY) + 0.5)
+    
+    # Let's reduce ice on smaller maps
+    if(sizey < 20):
+	mc.iceSlope *= 0.85
+    if(sizey < 11):
+	mc.iceSlope *= 0.85
 
     # The map generator goes in to an infinite loop if the output map is
     # bigger than (hmWidth, hmHeight)
@@ -5913,8 +5937,7 @@ def addFeatures():
     FORESTEVERGREEN = 1
     FORESTSNOWY = 2
 
-    if mc.WrapY == False:
-        createIce()
+    createIce()
     #Now plant forest or jungle
 ##    PrintTempMap(tm,tm.tempMap)
 ##    PrintRainMap(rm,rm.rainMap,False)
@@ -5985,26 +6008,22 @@ def createIce():
     gc = CyGlobalContext()
     mmap = gc.getMap()
     featureIce = gc.getInfoTypeForString("FEATURE_ICE")
-    if mc.WrapY == True:
-        iceChance = 0.5
-    else:
-        iceChance = 1.0
-    for y in range(4):
+    iceChance = mc.iceChance
+    iceRange = mc.iceRange
+    iceSlope = mc.iceSlope
+    for y in range(iceRange):
         for x in range(mc.width):
             plot = mmap.plot(x,y)
             if plot != 0 and plot.isWater() == True and PRand.random() < iceChance:
                 plot.setFeatureType(featureIce,0)
-        iceChance *= .66
-    if mc.WrapY == True:
-        iceChance = 0.5
-    else:
-        iceChance = 1.0
-    for y in range(mc.height - 1,mc.height - 5,-1):
+        iceChance *= iceSlope
+    iceChance = mc.iceChance
+    for y in range(mc.height - 1,mc.height - 1 - iceRange,-1):
         for x in range(mc.width):
             plot = mmap.plot(x,y)
             if plot != 0 and plot.isWater() == True and PRand.random() < iceChance:
                 plot.setFeatureType(featureIce,0)
-        iceChance *= .66
+        iceChance *= iceSlope
         
 def addBonuses():
     bp.AddBonuses()
