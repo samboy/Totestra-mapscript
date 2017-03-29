@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120522 (May 22, 2012)
+## File: Totestra.py version 20120523 (May 23, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,12 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120523:
+## 1) New option: Handicap level.  This can give the human player extra
+##    starting resources.
+## 2) Options to split continents and to have players on the "new world"
+##    verified to work.
 ##
 ## 20120522:
 ## 1) "Service tag" added as a sign in maps, so people who forgot to log
@@ -207,10 +213,11 @@ OPTION_Wrap = 3
 OPTION_IslandFactor = 4
 OPTION_Patience = 5
 OPTION_MapRatio = 6
-OPTION_MAX = OPTION_MapRatio + 1 # Add 1 because it's 1-indexed
+OPTION_Handicap = 7
+OPTION_MAX = OPTION_Handicap + 1 # Add 1 because it's 1-indexed
 
-# Setting this to 1 will allow some more map ratios which have not been
-# fully tested.  This ratios may cause problems; you have been warned
+# Setting this to 1 will allow the buggy 1:2 ratio; this ratio has
+# problems because of limitations in Civ 4's engine.  You have been warned.
 ALLOW_EXTREME_RATIOS = 0
 
 # Setting this to 0 will make it so the map does not have a "Service Tag"
@@ -228,24 +235,14 @@ class MapConstants :
         self.hmWidth  = 0
         self.hmHeight = 0
         self.serviceFlags = 0 # Used for concise description of flags
+	self.xtraFlags = 0 # We're running out of bits :(
+	self.AllowPangeas = False
         return
     def initialize(self):
         print "Initializing map constants"
 ##############################################################################
 ## GLOBAL TUNING VARIABLES: Change these to customize the map results
         
-        #If this variable is set to False, a shower of colossal meteors will attempt to
-        #break up any pangea-like continents. Setting this variable to True will allow
-        #pangeas to sometimes occur and should be greatly favored by any dinosaurs
-        #that might be living on this planet at the time.
-        self.AllowPangeas = False
-
-        #This variable can be used to turn off 'New world' logic and place starting
-        #positions anywhere in the world. For some mods, a new world doesn't make
-        #sense.
-        self.AllowNewWorld = True
-        
-
         #---The following variables are not based on percentages. Because temperature
         #---is so strongly tied to latitude, using percentages for things like ice and
         #---tundra leads to very strange results if most of the worlds land lies near
@@ -438,17 +435,6 @@ class MapConstants :
         #value.
         self.RiverCityValueBonus = 1.2
         
-        #Bonus resources to add depending on difficulty settings
-        self.SettlerBonus = 0
-        self.ChieftainBonus = 0
-        self.WarlordBonus = 0
-        self.NobleBonus = 0
-        self.PrinceBonus = 1
-        self.MonarchBonus = 1
-        self.EmperorBonus = 2
-        self.ImmortalBonus = 2
-        self.DeityBonus = 3
-        
         #Decides whether to use the Python random generator or the one that is
         #intended for use with civ maps. The Python random has much higher precision
         #than the civ one. 53 bits for Python result versus 16 for getMapRand. The
@@ -514,7 +500,10 @@ class MapConstants :
             self.landPercent = 0.19
 
         self.serviceFlags = 0 # Used for concise description of flags
-        self.serviceFlags |= (seaLevel & 3) # 2 bits; total 2
+	if(seaLevel != 0):
+            self.serviceFlags |= (seaLevel & 3) # 2 bits; total 2
+	else:
+            self.serviceFlags |= 3 # Make sure Service Tag is always 21 digits
       
         # Have climate affect the maps 
         # This is increased for a "tropical" climate
@@ -596,16 +585,18 @@ class MapConstants :
       
         #New World Rules
         selectionID = mmap.getCustomMapOption(OPTION_NewWorld)
+        self.AllowNewWorld = True
         if selectionID == 1:
-            self.AllowNewWorld = not self.AllowNewWorld
+            self.AllowNewWorld = False
 
         self.serviceFlags <<= 1
         self.serviceFlags |= (self.AllowNewWorld & 1) # 1 bit; total 6
 
         #Pangaea Rules
         selectionID = mmap.getCustomMapOption(OPTION_Pangaea)
+        self.AllowPangeas = False
         if selectionID == 1:
-            self.AllowPangeas = not self.AllowPangeas
+            self.AllowPangeas = True
 
         self.serviceFlags <<= 1
         self.serviceFlags |= (self.AllowPangeas & 1) # 1 bit; total 7
@@ -702,6 +693,23 @@ class MapConstants :
         self.serviceFlags |= (selectionID & 3) # Map wrap; 2 bits total 15
         self.serviceFlags <<= 6 # 6 bits so we know the map size total 21
 
+	self.xtraFlags = 0
+	# handicap of 0 means player is equal to AI and may get a 
+	# starting position that can not be won at higher difficulty
+	# settings.  Values of 1, 2, or 3 make it easier for the player
+	handicap = mmap.getCustomMapOption(OPTION_Handicap)
+	self.xtraFlags |= ((handicap & 3) << 5)
+        #Bonus resources to add depending on difficulty settings
+        self.SettlerBonus = handicap
+        self.ChieftainBonus = handicap 
+        self.WarlordBonus = handicap 
+        self.NobleBonus = handicap 
+        self.PrinceBonus = handicap 
+        self.MonarchBonus = handicap 
+        self.EmperorBonus = handicap 
+        self.ImmortalBonus = handicap 
+        self.DeityBonus = handicap 
+        
         #After generating the heightmap, bands of ocean can be added to the map
         #to allow a more consistent climate generation. These bands are useful
         #if you are generating part of a world where the weather might be coming
@@ -835,6 +843,7 @@ class PythonRandom :
                 self.seedString = "Fixed seed (Using Python rands) for this map is %(s)20d" % {"s":seedValue}
 	    mc.serviceTag = (seedValue & 0xffffffffffffff)
 	    mc.serviceTag |= (mc.serviceFlags << 60)
+	    mc.serviceTag |= (mc.xtraFlags << 53)
 	    mc.serviceString = ("%x" % mc.serviceTag)
             print "SERVICE TAG: " + mc.serviceString 
             seed(seedValue)
@@ -5333,6 +5342,8 @@ def getCustomMapOptionName(argsList):
             return "Patience amount"
         elif optionID == OPTION_MapRatio:
             return "Map ratio"
+        elif optionID == OPTION_Handicap:
+            return "Player bonus resources"
 
         return u""
 	
@@ -5360,7 +5371,9 @@ def getNumCustomMapOptionValues(argsList):
 	    if ALLOW_EXTREME_RATIOS == 1:
 	    	return 7 
 	    else:
-                return 4
+                return 6
+        elif optionID == OPTION_Handicap:
+	    return 4
         return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -5374,26 +5387,14 @@ def getCustomMapOptionDescAt(argsList):
     selectionID = argsList[1]
     if optionID == OPTION_NewWorld:
         if selectionID == 0:
-            if mc.AllowNewWorld:
-                return "Start in Old World"
-            else:
-                return "Start Anywhere"
+            return "Start in Old World"
         elif selectionID == 1:
-            if mc.AllowNewWorld:
-                return "Start Anywhere"
-            else:
-                return "Start in Old World"
+            return "Start Anywhere"
     elif optionID == OPTION_Pangaea:
         if selectionID == 0:
-            if mc.AllowPangeas:
-                return "Allow Pangaeas"
-            else:
-                return "Break Pangaeas"
+            return "Break Pangaeas"
         elif selectionID == 1:
-            if mc.AllowPangeas:
-                return "Break Pangaeas"
-            else:
-                return "Allow Pangaeas"
+            return "Allow Pangaeas"
     elif optionID == OPTION_Wrap:
         if selectionID == 0:
             return "Cylindrical"
@@ -5443,6 +5444,15 @@ def getCustomMapOptionDescAt(argsList):
             return "7:1 (Ringworld)"
         elif selectionID == 5:
             return "3:3 (Big square)"
+    elif optionID == OPTION_Handicap:
+	if selectionID == 0:
+	    return "None (Player equal to AI)"
+	if selectionID == 1:
+	    return "A little"
+	if selectionID == 2:
+	    return "Some"
+	if selectionID == 3:
+	    return "Lots (Easier for player)"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
