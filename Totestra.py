@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120526 (May 26, 2012)
+## File: Totestra.py version 20120527 (May 27, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,9 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120527:
+## 1) Adding test case for bug reported by En Dotter
 ##
 ## 20120526:
 ## 1) En Dotter feature request: It's now possible to change how the map
@@ -803,8 +806,10 @@ class MapConstants :
             #self.hmHeight = 97
             #heightmap_size_factor = 3
             #self.AllowPangeas = False
-	elif selectionID == 4: # En Dotter
+	elif selectionID == 4: # En Dotter 1
             self.totestra = 0x8f3d2735334af # En Dotter's low on resources map 
+	elif selectionID == 5:
+	    self.totestra = 0x4eceb2bbd8853 # En Dotter's nearby starts map
 
         #Number of tectonic plates
         self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
@@ -5394,7 +5399,7 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == OPTION_Wrap:
             return 3
         elif optionID == OPTION_MapSeed: # Map world
-            return 5
+            return 6
         elif optionID == OPTION_IslandFactor: # Number continents
             return 4
         elif optionID == OPTION_Patience: # Speed/quality tradeoff
@@ -5443,13 +5448,15 @@ def getCustomMapOptionDescAt(argsList):
         if selectionID == 0:
             return "Random"
         elif selectionID == 1:
-            return "Fixed #1 (Totestra)"
+            return "Preset #1 (Totestra)"
         if selectionID == 2:
-            return "Fixed #2 (Cephalo)"
+            return "Preset #2 (Cephalo)"
         elif selectionID == 3:
-            return "Fixed #3 (Caulixtla)"
+            return "Preset #3 (Caulixtla)"
 	elif selectionID == 4:
-	    return "Fixed #4 (En Dotter)"
+	    return "Preset #4 (En Dotter 1)"
+	elif selectionID == 5:
+	    return "Preset #5 (En Dotter 2)"
     elif optionID == OPTION_IslandFactor:
         if selectionID == 0:
             return "Few (faster)"
