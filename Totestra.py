@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120523 (May 23, 2012)
+## File: Totestra.py version 20120524 (May 24, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,9 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120524:
+## 1) New civ placement option: Have all civs placed on the same continent
 ##
 ## 20120523:
 ## 1) New option: Handicap level.  This can give the human player extra
@@ -586,8 +589,14 @@ class MapConstants :
         #New World Rules
         selectionID = mmap.getCustomMapOption(OPTION_NewWorld)
         self.AllowNewWorld = True
+	self.ShareContinent = False
         if selectionID == 1:
             self.AllowNewWorld = False
+	elif selectionID == 2:
+	    self.ShareContinent = True
+
+	self.xtraFlags = 0
+	self.xtraFlags |= ((self.ShareContinent & 1) << 4)
 
         self.serviceFlags <<= 1
         self.serviceFlags |= (self.AllowNewWorld & 1) # 1 bit; total 6
@@ -693,12 +702,12 @@ class MapConstants :
         self.serviceFlags |= (selectionID & 3) # Map wrap; 2 bits total 15
         self.serviceFlags <<= 6 # 6 bits so we know the map size total 21
 
-	self.xtraFlags = 0
 	# handicap of 0 means player is equal to AI and may get a 
 	# starting position that can not be won at higher difficulty
 	# settings.  Values of 1, 2, or 3 make it easier for the player
 	handicap = mmap.getCustomMapOption(OPTION_Handicap)
 	self.xtraFlags |= ((handicap & 3) << 5)
+	
         #Bonus resources to add depending on difficulty settings
         self.SettlerBonus = handicap
         self.ChieftainBonus = handicap 
@@ -3289,7 +3298,10 @@ class ContinentMap :
         
         for n in range(len(continentList)):
             oldWorldSize += continentList[0].size
-            del continentList[0]
+	    # Don't delete "new worlds" from the list if we're going to
+            # put everyone on the "old world" continent
+	    if mc.ShareContinent == False:
+                del continentList[0]
             if float(oldWorldSize)/float(totalLand) > 0.60:
                 break
 
@@ -5329,7 +5341,7 @@ def getCustomMapOptionName(argsList):
         """
         optionID = argsList[0]
         if optionID == OPTION_NewWorld:
-            return "New World Rule"
+            return "Civ placement"
         elif optionID == OPTION_Pangaea:
             return "Pangaea Rule"
         elif optionID == OPTION_Wrap:
@@ -5355,7 +5367,7 @@ def getNumCustomMapOptionValues(argsList):
         """
         optionID = argsList[0]
         if optionID == OPTION_NewWorld:
-            return 2
+            return 3
         elif optionID == OPTION_Pangaea:
             return 2
         elif optionID == OPTION_Wrap:
@@ -5387,9 +5399,11 @@ def getCustomMapOptionDescAt(argsList):
     selectionID = argsList[1]
     if optionID == OPTION_NewWorld:
         if selectionID == 0:
-            return "Start in Old World"
+            return "Keep New World empty"
         elif selectionID == 1:
-            return "Start Anywhere"
+            return "Start anywhere reasonable"
+	elif selectionID == 2:
+	    return "Everyone on same landmass"
     elif optionID == OPTION_Pangaea:
         if selectionID == 0:
             return "Break Pangaeas"
