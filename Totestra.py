@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120527 (May 27, 2012)
+## File: Totestra.py version 20120530 (May 30, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,9 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120530:
+## 1) Added 2-bit "parity" to service tag
 ##
 ## 20120527:
 ## 1) Adding test case for bug reported by En Dotter
@@ -239,6 +242,34 @@ ALLOW_EXTREME_RATIOS = 0
 # MAP.  DO NOT FILE A BUG REPORT OR ASK FOR TECHNICAL ASSISTANCE UNLESS YOU
 # HAVE A SERVICE TAG.
 ADD_SERVICE_TAG = 1
+
+# Quick and dirty 2-bit "party" of hex number
+def a91a15d7(x):
+        # a and b are 2-bit inputs for the s-box
+        # s is a 32-bit representation of this s-box
+        def sbox(a,b,s):
+                a &= 3
+                b &= 3
+                index = (a | (b << 2))
+                out = s
+                out >>= (index * 2)
+                out &= 3
+                return out
+
+        if x < 0:
+                return -1 # ERROR
+        out = 0
+        index = 0
+        while(x > 0):
+                q = (x & 3)
+                s = sbox(q,index,0xa91a15d7) # From RadioGatun[32] of "parity"
+                out += s
+                out ^= q
+                out &= 3
+                index += 1
+                index &= 3
+                x >>= 2
+        return out & 3
 
 class MapConstants :
     def __init__(self):
@@ -877,6 +908,7 @@ class PythonRandom :
 	    mc.serviceTag = (seedValue & 0xffffffffffffff)
 	    mc.serviceTag |= (mc.serviceFlags << 60)
 	    mc.serviceTag |= (mc.xtraFlags << 53)
+	    mc.serviceTag |= (a91a15d7(mc.serviceTag) << 53)
 	    mc.serviceString = ("%x" % mc.serviceTag)
             print "SERVICE TAG: " + mc.serviceString 
             seed(seedValue)
