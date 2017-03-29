@@ -1,5 +1,6 @@
 ##############################################################################
-## File: PerfectWorld.py version 2.06
+## File: Totestra.py version 20120512 (May 12, 2012)
+## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
 ## Copyright 2007 Rich Marinaccio
@@ -47,6 +48,21 @@
 ##
 ##############################################################################
 ## Version History
+## Totestra - Sam Trenholme's update of PerfectWorld2.py
+## 20120512:
+## 1) Faster lower-quality maps now tweaked and fixed.  "fast and dirty" caps
+##    the size: if you ask for huge you will get a medium sized map.
+## 2) Climate can now be selected and it affects the map
+## 3) Begin work on making the map ratio user-configurable
+##
+## 20120505: 
+## 1) Water level can now be adjusted in Civ4's GUI
+## 2) It is now possible to use a fixed or a random map seed
+## 3) There is an untested ability to more quickly make lower-quality maps,
+##    or, likewise, more slowly make better maps.
+##
+## Perfect World 2, Cephalo's original map generator changelog history:
+##
 ## 2.06 - Fixed a few bugs from my minimum hill/maximum bad feature function.
 ##
 ## 2.05 - Made maps of standard size and below a bit smaller. Changed the way I
@@ -187,50 +203,12 @@ class MapConstants :
         #sense.
         self.AllowNewWorld = True
         
-        #How many land squares will be above peak threshold and thus 'peaks'.
-        self.PeakPercent = 0.12
 
-        #How many land squares will be above hill threshold and thus 'hills' unless
-        #they are also above peak threshold in which case they will be 'peaks'.
-        self.HillPercent = 0.35
-
-        #In addition to the relative peak and hill generation, there is also a
-        #process that changes flats to hills or peaks based on altitude. This tends
-        #to randomize the high altitude areas somewhat and improve their appearance.
-        #These variables control the frequency of hills and peaks at the highest altitude.
-        self.HillChanceAtOne = .50
-        self.PeakChanceAtOne = .27
-
-        #How many land squares will be below desert rainfall threshold. In this case,
-        #rain levels close to zero are very likely to be desert, while rain levels close
-        #to the desert threshold will more likely be plains.
-        self.DesertPercent = 0.20
-
-        #How many land squares will be below plains rainfall threshold. Rain levels close
-        #to the desert threshold are likely to be plains, while those close to the plains
-        #threshold are likely to be grassland. 
-        self.PlainsPercent = 0.42
-        
         #---The following variables are not based on percentages. Because temperature
         #---is so strongly tied to latitude, using percentages for things like ice and
         #---tundra leads to very strange results if most of the worlds land lies near
         #---the equator
 
-        #What temperature will be considered cold enough to be ice. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.SnowTemp = .30
-
-        #What temperature will be considered cold enough to be tundra. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.TundraTemp = .35
-
-        #Hotter than this temperature will be considered deciduous forest, colder will
-        #be evergreen forest.Temperatures range from coldest 0.0 to hottest 1.0.
-        self.ForestTemp = .50
-
-        #What temperature will be considered hot enough to be jungle. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.JungleTemp = .7
 
         #Sets the threshold for jungle rainfall by modifying the plains threshold by this factor.
         self.TreeFactor = 1.5
@@ -290,7 +268,7 @@ class MapConstants :
         self.polarFrontLatitude = 60
 
         #Tropics of Cancer and Capricorn plus and minus respectively
-        self.tropicsLatitude = 23
+        #self.tropicsLatitude = 23
 
         #Oceans are slow to gain and lose heat, so the max and min temps
         #are reduced and raised by this much.
@@ -338,7 +316,6 @@ class MapConstants :
         #noise(smooth).
         self.hmNoiseLevel = 2.0
 
-
         #Influence of the plate map, or how much of it is added to the height map.
         self.plateMapScale = 1.1
 
@@ -383,7 +360,6 @@ class MapConstants :
         #the initial large heightmap (mc.hmWidth, mc.hmHeight) before the
         #shrinking process
         self.minInlandSeaSize = 100
-        
 
         #Too many meteors will simply destroy the Earth, and just
         #in case the meteor shower can't break the pangaea, this will also
@@ -456,9 +432,12 @@ class MapConstants :
         self.NORTH_SOUTH_SEPARATION = 1
         self.EAST_WEST_SEPARATION = 2
 
+        # THESE DO NOT CHANGE ANYTHING.  They are overwritten by
+        # mmap.getGridWidth() and mmap.getGridHeight()
         self.width = 104
         self.height = 64
 
+        # These should probably not be changed...
         self.OCEAN = 0
         self.LAND = 1
         self.HILLS = 2
@@ -492,7 +471,71 @@ class MapConstants :
             self.landPercent = 0.43
         elif seaLevel == 2:
             self.landPercent = 0.19
+      
+        # Have climate affect the maps 
+        # This is increased for a "tropical" climate
+        self.tropicsLatitude = 23
+ 
+        # These are increased for "rocky" climates
+        #How many land squares will be above peak threshold and thus 'peaks'.
+        self.PeakPercent = 0.12
+
+        #How many land squares will be above hill threshold and thus 'hills' 
+        #unless hey are also above peak threshold in which case they will 
+        #be 'peaks'.
+        self.HillPercent = 0.35
         
+        #In addition to the relative peak and hill generation, there is also a
+        #process that changes flats to hills or peaks based on altitude. This tends
+        #to randomize the high altitude areas somewhat and improve their appearance.
+        #These variables control the frequency of hills and peaks at the highest altitude.
+        self.HillChanceAtOne = .50
+        self.PeakChanceAtOne = .27
+
+        #How many land squares will be below desert rainfall threshold. In this case,
+        #rain levels close to zero are very likely to be desert, while rain levels close
+        #to the desert threshold will more likely be plains.
+        self.DesertPercent = 0.20
+
+        #How many land squares will be below plains rainfall threshold. Rain levels close
+        #to the desert threshold are likely to be plains, while those close to the plains
+        #threshold are likely to be grassland. 
+        self.PlainsPercent = 0.42
+        
+        #What temperature will be considered cold enough to be ice. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.SnowTemp = .30
+
+        #What temperature will be considered cold enough to be tundra. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.TundraTemp = .35
+
+        #Hotter than this temperature will be considered deciduous forest, colder will
+        #be evergreen forest.Temperatures range from coldest 0.0 to hottest 1.0.
+        self.ForestTemp = .50
+
+        #What temperature will be considered hot enough to be jungle. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.JungleTemp = .7
+
+        # Temperate: 0 Tropical: 1 Arid: 2 Rocky: 3 Cold: 4
+        clim = mmap.getClimate() 
+        if clim == 1: # Tropical
+            self.tropicsLatitude = 46
+        elif clim == 2: # Arid
+            self.DesertPercent = 0.40
+            self.PlainsPercent = 0.82
+        elif clim == 3: # Rocky
+            self.PeakPercent = 0.24
+            self.HillPercent = 0.70
+            self.HillChanceAtOne = 0.70
+            self.PeakChanceAtOnce = 0.43
+        elif clim == 4: # Cold
+            self.tropicsLatitude = 0
+            self.SnowTemp = .50
+            self.TundraTemp = .75
+            self.ForestTemp = .85
+            self.JungleTemp = .99
         
         #New World Rules
         selectionID = mmap.getCustomMapOption(1)
@@ -505,6 +548,7 @@ class MapConstants :
 
         # How long are they willing to wait for the map to be made
         patience = mmap.getCustomMapOption(5)
+        patience += 1 # Patience at 0 is broken
 
         # The preset worlds have hard-coded values
         selectionID = mmap.getCustomMapOption(0)
@@ -525,10 +569,27 @@ class MapConstants :
         # Make it easy to change the size while keeping the aspect ratio
         # The bigger the size factor, the smaller the continents and the
         # slower the map generation process
+
+        # X and Y values for the map's aspect ratio
+        if(mmap.getCustomMapOption(0) == 0):
+            self.ratioX = mmap.getCustomMapOption(6) + 1
+        else:
+            self.ratioX = 1
+        if(self.ratioX < 1):
+            self.ratioX = 1
+        self.ratioX = 3 # DEBUG (we need to fix Ratio's bugs)
+        self.ratioY = 2
+
         selectionID = mmap.getCustomMapOption(4)
         heightmap_size_factor = 3 + selectionID
-        self.hmWidth  = (self.hmMaxGrain * 3 * heightmap_size_factor)
-        self.hmHeight = (self.hmMaxGrain * 2 * heightmap_size_factor) + 1
+        self.hmWidth  = (self.hmMaxGrain * self.ratioX * 
+                         heightmap_size_factor)
+        self.hmHeight = (self.hmMaxGrain * self.ratioY * 
+                         heightmap_size_factor) + 1
+
+        # These are expressed in 4x4 "Grid" units
+        self.maxMapWidth = int(self.hmWidth / 4)
+        self.maxMapHeight = int(self.hmHeight / 4)
          
         #Wrap options
         selectionID = mmap.getCustomMapOption(3)
@@ -614,6 +675,12 @@ class MapConstants :
         elif patience == 3:
             self.hmNumberOfPlates = int(
                 float(self.hmWidth * self.hmHeight) * 0.0008)
+        elif patience == 4:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0004)
+        elif patience >= 5:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0002)
 
         self.optionsString = "Map Options: \n"
         if self.AllowNewWorld:
@@ -626,6 +693,11 @@ class MapConstants :
             self.optionsString += "AllowPangeas = false\n"
         self.optionsString += "Wrap Option = " + wrapString + "\n"
         self.optionsString += "Map world = " + mapRString + "\n" 
+        self.optionsString += "Land percent = " + str(self.landPercent) + "\n"
+        self.optionsString += "RatioX = " + str(self.ratioX) + "\n"
+        self.optionsString += "RatioY = " + str(self.ratioY) + "\n"
+        self.optionsString += "Climate = " + str(clim) + "\n"
+        self.optionsString += "Patience = " + str(patience) + "\n"
         self.optionsString += "Number continents = " + str(heightmap_size_factor) +"\n" 
 
         print str(self.optionsString) + "\n" 
@@ -713,7 +785,7 @@ def errorPopUp(message):
                 popupInfo.addPythonButton("Ok","")
                 popupInfo.addPopup(iPlayer)
                 
-#This function converts x and y to an index.
+#This function converts x and y to a one-dimensional index.
 def GetIndex(x,y):
     #Check X for wrap
     if mc.WrapX == True:
@@ -733,6 +805,7 @@ def GetIndex(x,y):
     i = yy * mc.width + xx
     return i
 
+# This does the same thing for the height map (as opposed to the plot map)
 def GetHmIndex(x,y):
     #Check X for wrap
     if mc.WrapX == True:
@@ -772,7 +845,6 @@ def GetIndexGeneral(x,y,width,height):
     i = yy * width + xx
     return i
 
-
 #This function scales a float map so that all values are between
 #0.0 and 1.0.
 def NormalizeMap(fMap,width,height):
@@ -799,8 +871,28 @@ def NormalizeMap(fMap,width,height):
         for x in range(width):
             fMap[GetIndexGeneral(x,y,width,height)] = fMap[GetIndexGeneral(x,y,width,height)] * scaler              
     return
+
+# This takes a large map and scales it to make it smaller
 def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
+
+    #print "Calling ShrinkMap" ##DEBUG##
     smallMap = array('d')
+    for y in range(sHeight):
+        for x in range(sWidth):
+	    smallMap.append(0)
+
+    # If the "small" map is, in fact, bigger, repeat the "large" map
+    # This looks **REALLY BAD** and should not be done
+    if(sWidth > lWidth and sHeight > lHeight):
+        #print "Enlarge ShrinkMap" ##DEBUG##
+        for x in range(sWidth):
+	    for y in range(sHeight):
+	        smallMap[GetIndexGeneral(x,y,sWidth,sHeight)] = (
+	    	 largeMap[GetIndexGeneral(x % lWidth,y % lHeight, 
+		 lWidth, lHeight)])
+        return smallMap
+
+    #Scale down a large map down to a small map
     yScale = float(lHeight)/float(sHeight)
     xScale = float(lWidth)/float(sWidth)
     for y in range(sHeight):
@@ -828,9 +920,13 @@ def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
                     weights += weight
                     contributors += weight * contributor
 ##            print " final height = %f" % (contributors/weights)        
-            smallMap.append(contributors/weights)
+            #smallMap.append(contributors/weights)
+	    smallMap[GetIndexGeneral(x,y,sWidth,sHeight)] = (
+	    	contributors/weights)
+            #smallMap.append(contributors/weights)
                     
     return smallMap
+
 def GetWeight(x,y,xx,yy,xScale,yScale):
     xWeight = 1.0
 ##    print "   xScale = %f" % xScale
@@ -1955,6 +2051,7 @@ class ClimateMap :
             for x in range(mc.hmWidth):
                 tempMap.append(self.getInitialTemp(x,y,tropic))
         return
+
     def getInitialTemp(self,x,y,tropic):
         i = GetHmIndex(x,y)
         lat = self.getLatitude(y)
@@ -3517,7 +3614,13 @@ class RiverMap :
                 rainFall = self.averageRainfallMap[i]
                 xx = x
                 yy = y
+                loop = 1
                 while(flow != self.L and flow != self.O):
+		    #print "loop %d" % (loop) ##DEBUG##
+                    loop += 1
+                    if(loop > 512):
+		        raise ValueError, "Rainfall infinite loop"
+
                     if(flow == self.N):
                         yy += 1
                     elif(flow == self.S):
@@ -5100,7 +5203,7 @@ def getNumCustomMapOptions():
     Return an integer
     """
     mc.initialize()
-    return 6
+    return 6 # Map ratios disabled until I iron out the bugs
 	
 def getCustomMapOptionName(argsList):
         """
@@ -5121,6 +5224,8 @@ def getCustomMapOptionName(argsList):
             return "Continent amount"
         elif optionID == 5:
             return "Patience amount"
+        elif optionID == 6:
+            return "Map ratio"
 
         return u""
 	
@@ -5142,6 +5247,8 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == 4: # Number continents
             return 4
         elif optionID == 5: # Speed/quality tradeoff
+            return 3
+        elif optionID == 6: # Map ratio
             return 4
         return 0
 	
@@ -5202,14 +5309,23 @@ def getCustomMapOptionDescAt(argsList):
         elif selectionID == 3:
             return "Lots (slow)"
     elif optionID == 5:
-        if selectionID == 0:
+        if selectionID == -1:
             return "Not very (Faster mapgen)"
-        elif selectionID == 1:
-            return "A little"
-        if selectionID == 2:
+        elif selectionID == 0:
+            return "A little (faster mapgen)"
+        if selectionID == 1:
             return "Somewhat"
-        elif selectionID == 3:
+        elif selectionID == 2:
             return "Extremely (nicer map)"
+    elif optionID == 6: # Map ratio
+        if selectionID == 0:
+            return "2:1 (tall map)"
+        elif selectionID == 1:
+            return "1:1 (Square map)"
+        elif selectionID == 2:
+            return "3:2 (Earth-like)"
+        elif selectionID == 3:
+            return "2:1 (Wide map)"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
@@ -5220,10 +5336,14 @@ def getCustomMapOptionDefault(argsList):
 	"""
 	#Always zero in this case
 	#print argsList[0]
-        if argsList[0] != 5:
+        if argsList[0] < 5:
             return 0
+        elif argsList[0] == 5:
+            return 1 # Slow speed/good quality (Mark's default)
+        elif argsList[0] == 6: # Map ratio
+            return 2 # 3:2 maps
         else:
-            return 2 # Slow speed/quality (Mark's default)
+            return 0
     
 def isRandomCustomMapOption(argsList):
 	"""
@@ -5260,15 +5380,9 @@ def isAdvancedMap():
         GlobalThisIsAdvanced = 1
 	return 0
 def isClimateMap():
-	"""
-	Uses the Climate options
-	"""
-	return 0
+	return 1
 	
 def isSeaLevelMap():
-	"""
-	Uses the Sea Level options
-	"""
 	return 1
     
 def getTopLatitude():
@@ -5291,7 +5405,21 @@ def getGridSize(argsList):
     if (argsList[0] == -1): # (-1,) is passed to function on loads
             return []
     [eWorldSize] = argsList
-    return grid_sizes[eWorldSize]
+
+    (sizex, sizey) = grid_sizes[eWorldSize]
+    # The above values are for a 3:2 ratio.  We also support other ratios
+    base_size = float(sizey) / 2 # base sizes: 3.5, 5, 6.5, 8, 10, 12
+    sizex = int((base_size * mc.ratioX) + 0.5)
+    sizey = int((base_size * mc.ratioY) + 0.5)
+
+    # The map generator goes in to an infinite loop if the output map is
+    # bigger than (hmWidth, hmHeight)
+    if(sizex > mc.maxMapWidth):
+	sizex = mc.maxMapWidth
+    if(sizey > mc.maxMapHeight):
+	sizey = mc.maxMapHeight
+
+    return (sizex, sizey)
 
 def generatePlotTypes():
     gc = CyGlobalContext()
@@ -5327,6 +5455,7 @@ def generatePlotTypes():
             plotTypes[i] = PlotTypes.PLOT_OCEAN
     print "Finished generating plot types."         
     return plotTypes
+
 def generateTerrainTypes():
     NiTextOut("Generating Terrain  ...")
     print "Adding Terrain"
@@ -5438,6 +5567,7 @@ def placeRiversInPlot(x,y):
             plot.setWOfRiver(True,CardinalDirectionTypes.CARDINALDIRECTION_NORTH)
         elif rm.riverMap[ii] == rm.W:
             plot.setNOfRiver(True,CardinalDirectionTypes.CARDINALDIRECTION_WEST)
+
 '''
 This function examines a lake area and removes ugly surrounding rivers. Any
 river that is flowing away from the lake, or alongside the lake will be
@@ -5502,6 +5632,7 @@ def cleanUpLake(x,y):
     #Southeast plot is not relevant 
             
     return riversIntoLake
+
 '''
 This function replaces rivers to update the river crossings after a lake or
 channel is placed at X,Y. There had been a long standing problem where water tiles
