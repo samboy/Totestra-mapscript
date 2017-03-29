@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120512 (May 12, 2012)
+## File: Totestra.py version 20120522 (May 22, 2012)
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
 ## Modified by Sam Trenholme; I am assigning all copyright to Rich
@@ -49,6 +49,10 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 20120522:
+## 1) "Service tag" added as a sign in maps, so people who forgot to log
+##    Python debug information can still get full support.
 ##
 ## 20120521:
 ## 1) Overhaul of selection code; symbolic names are now used instead of
@@ -209,11 +213,21 @@ OPTION_MAX = OPTION_MapRatio + 1 # Add 1 because it's 1-indexed
 # fully tested.  This ratios may cause problems; you have been warned
 ALLOW_EXTREME_RATIOS = 0
 
+# Setting this to 0 will make it so the map does not have a "Service Tag"
+# sign placed on it.  If the sign (which should be placed in an unusable
+# ice square, usually at the top of the map) annoys you, disabled this, but
+# heed this warning first:
+# I CAN NOT PROVIDE TECHNICAL ASSISTANCE WITHOUT A SERVICE TAG FOR YOUR
+# MAP.  DO NOT FILE A BUG REPORT OR ASK FOR TECHNICAL ASSISTANCE UNLESS YOU
+# HAVE A SERVICE TAG.
+ADD_SERVICE_TAG = 1
+
 class MapConstants :
     def __init__(self):
         self.totestra = 0 
         self.hmWidth  = 0
         self.hmHeight = 0
+        self.serviceFlags = 0 # Used for concise description of flags
         return
     def initialize(self):
         print "Initializing map constants"
@@ -498,6 +512,9 @@ class MapConstants :
             self.landPercent = 0.43
         elif seaLevel == 2:
             self.landPercent = 0.19
+
+        self.serviceFlags = 0 # Used for concise description of flags
+        self.serviceFlags |= (seaLevel & 3) # 2 bits; total 2
       
         # Have climate affect the maps 
         # This is increased for a "tropical" climate
@@ -574,18 +591,31 @@ class MapConstants :
             self.iceChance = 1.2
 	    self.iceSlope = 0.87 # Lots of ice
         
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (clim & 7) # 3 bits; total 5
+      
         #New World Rules
         selectionID = mmap.getCustomMapOption(OPTION_NewWorld)
         if selectionID == 1:
             self.AllowNewWorld = not self.AllowNewWorld
+
+        self.serviceFlags <<= 1
+        self.serviceFlags |= (self.AllowNewWorld & 1) # 1 bit; total 6
+
         #Pangaea Rules
         selectionID = mmap.getCustomMapOption(OPTION_Pangaea)
         if selectionID == 1:
             self.AllowPangeas = not self.AllowPangeas
 
+        self.serviceFlags <<= 1
+        self.serviceFlags |= (self.AllowPangeas & 1) # 1 bit; total 7
+
         # How long are they willing to wait for the map to be made
         patience = mmap.getCustomMapOption(OPTION_Patience)
         patience += 1 # Patience at 0 is broken
+
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (patience & 7) # 3 bits; total 10
 
         # The preset worlds have hard-coded values
         selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
@@ -626,21 +656,27 @@ class MapConstants :
 	elif ratioValue == 3: # 2:1
 		self.ratioX = 4
 		self.ratioY = 2
-        elif ratioValue == 4: # 1:2; down here because it's buggy
-		self.ratioX = 2
-		self.ratioY = 4
-	elif ratioValue == 5: # 7:1, Ringworld (untested)
+	elif ratioValue == 4: # 7:1, Ringworld 
 		self.ratioX = 7
 		self.ratioY = 1
-	elif ratioValue == 6: # 1:7, Vertical Ringworld (untested)
-		self.ratioX = 1
-		self.ratioY = 7
+	elif ratioValue == 5: # 3:3, Big square (untested)
+		self.ratioX = 3
+		self.ratioY = 3
+        elif ratioValue == 6: # 1:2; down here because it's buggy
+		self.ratioX = 2
+		self.ratioY = 4
 
 	if patience < 2:
         	self.ratioX = 3 # One less thing to SQA
         	self.ratioY = 2
 
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (ratioValue & 7) # 3 bits; total 13
+
         selectionID = mmap.getCustomMapOption(OPTION_IslandFactor)
+
+        self.serviceFlags <<= 2
+        self.serviceFlags |= (selectionID & 3) # Island factor
 
 	# If they want a fast map, don't allow them to select more islands
 	if(patience < 2):
@@ -661,6 +697,10 @@ class MapConstants :
         wrapString = "Cylindrical"
 	self.WrapX = True
 	self.WrapY = False
+
+        self.serviceFlags <<= 2 
+        self.serviceFlags |= (selectionID & 3) # Map wrap; 2 bits total 15
+        self.serviceFlags <<= 6 # 6 bits so we know the map size total 21
 
         #After generating the heightmap, bands of ocean can be added to the map
         #to allow a more consistent climate generation. These bands are useful
@@ -793,6 +833,10 @@ class PythonRandom :
             else:
                 seedValue = mc.totestra
                 self.seedString = "Fixed seed (Using Python rands) for this map is %(s)20d" % {"s":seedValue}
+	    mc.serviceTag = (seedValue & 0xffffffffffffff)
+	    mc.serviceTag |= (mc.serviceFlags << 60)
+	    mc.serviceString = ("%x" % mc.serviceTag)
+            print "SERVICE TAG: " + mc.serviceString 
             seed(seedValue)
             
         else:
@@ -941,7 +985,6 @@ def NormalizeMap(fMap,width,height):
 # This takes a large map and scales it to make it smaller
 def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
 
-    #print "Calling ShrinkMap" ##DEBUG##
     smallMap = array('d')
     for y in range(sHeight):
         for x in range(sWidth):
@@ -950,7 +993,6 @@ def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
     # If the "small" map is, in fact, bigger, repeat the "large" map
     # This looks **REALLY BAD** and should not be done
     if(sWidth > lWidth and sHeight > lHeight):
-        #print "Enlarge ShrinkMap" ##DEBUG##
         for x in range(sWidth):
 	    for y in range(sHeight):
 	        smallMap[GetIndexGeneral(x,y,sWidth,sHeight)] = (
@@ -3682,7 +3724,6 @@ class RiverMap :
                 yy = y
                 loop = 1
                 while(flow != self.L and flow != self.O):
-		    #print "loop %d" % (loop) ##DEBUG##
                     loop += 1
                     if(loop > 512):
 		        raise ValueError, "Rainfall infinite loop"
@@ -5396,12 +5437,12 @@ def getCustomMapOptionDescAt(argsList):
             return "3:2 (Earth-like)"
         elif selectionID == 3:
             return "2:1 (Wide map)"
-        elif selectionID == 4: 
-            return "1:2 (Very tall map)" 
-        elif selectionID == 5:
+        elif selectionID == 6: 
+            return "1:2 (BUGGY)" 
+        elif selectionID == 4:
             return "7:1 (Ringworld)"
-        elif selectionID == 6:
-            return "1:7 (Hula hoop)"
+        elif selectionID == 5:
+            return "3:3 (Big square)"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
@@ -5499,6 +5540,7 @@ def getGridSize(argsList):
     if(sizey > mc.maxMapHeight):
 	sizey = mc.maxMapHeight
 
+    mc.serviceFlags |= sizey # 21 bits, we have 3 more for other flags
     return (sizex, sizey)
 
 def generatePlotTypes():
@@ -6067,6 +6109,10 @@ def createIce():
     iceChance = mc.iceChance
     iceRange = mc.iceRange
     iceSlope = mc.iceSlope
+    signadded = 0 # We add the "Service Tag" sign while drawing ice
+    if(ADD_SERVICE_TAG != 1):
+	signadded = 1 # WARNING: NO SERVICE TAG MEANS NO SUPPORT
+    print "SERVICE TAG: " + mc.serviceString # Always log it, of course
     for y in range(iceRange):
         for x in range(mc.width):
             plot = mmap.plot(x,y)
@@ -6079,8 +6125,17 @@ def createIce():
             plot = mmap.plot(x,y)
             if plot != 0 and plot.isWater() == True and PRand.random() < iceChance:
                 plot.setFeatureType(featureIce,0)
+                if signadded == 0:
+			CyEngine().addSign(plot, -1, mc.serviceString)
+			print "Sign added at %d %d" % (x,y)
+			signadded = 1
         iceChance *= iceSlope
-        
+    # Make sure the service tag gets added to the map
+    if signadded == 0:
+	plot = mmap.plot(0,0)
+	CyEngine().addSign(plot, -1, mc.serviceString)    
+	print "Sign added at 0 0" % (x,y)
+
 def addBonuses():
     bp.AddBonuses()
     return
