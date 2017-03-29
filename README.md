@@ -8,3 +8,9 @@ more parameters that can be set inside Civ IV to the map generator, as
 well as fixing some long standing bugs with Cephalo's map generator. One
 goal of Totestra is 100% compatibility with PerfectWorld2; given the right
 parameters, Totestra will make the exact same map that PerfectWorld2 did.
+
+## Install
+
+To install the script, copy Totestra.py to the PublicMaps directory,
+which should be at /Users/yourname/Documents/My Games/Sid Meier's
+Civilization 4 Complete/PublicMaps or somewhere similar.
