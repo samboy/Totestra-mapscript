@@ -14,3 +14,7 @@ parameters, Totestra will make the exact same map that PerfectWorld2 did.
 To install the script, copy Totestra.py to the PublicMaps directory,
 which should be at /Users/yourname/Documents/My Games/Sid Meier's
 Civilization 4 Complete/PublicMaps or somewhere similar.
+
+## More information
+
+https://forums.civfanatics.com/threads/totestra-a-new-perfectworld2-fork.461262/
