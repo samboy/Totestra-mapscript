@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 20120615 (June 15, 2012)
+## File: Totestra.py version 2017-03-29 (March 29, 2017)
 ## Note: This is a finished product.  
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
@@ -50,6 +50,10 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 2017-03-29:
+## 1) Update tropical climate done by q3max, see http://bit.ly/2oAKQSx
+##    for original patch
 ##
 ## 20120615:
 ## 1) One-line bugfix for multi-player maps
