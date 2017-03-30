@@ -51,6 +51,10 @@
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
 ##
+## 2017-03-30:
+## 1) Converted line feeds in to DOS format so the script can be edited
+##    in Notepad on Windows.  No other changes done.
+##
 ## 2017-03-29:
 ## 1) Update tropical climate done by q3max, see http://bit.ly/2oAKQSx
 ##    for original patch
