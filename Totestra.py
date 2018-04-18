@@ -1,5 +1,5 @@
 ##############################################################################
-## File: Totestra.py version 2017-03-30 (March 30, 2017)
+## File: Totestra.py version 2018-04-18 (April 18, 2018)
 ## Note: This is a finished product.  
 ## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
@@ -50,6 +50,10 @@
 ##############################################################################
 ## Version History
 ## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+##
+## 2018-04-18:
+## 1) Another possible world, Atlixco, added
 ##
 ## 2017-03-30:
 ## 1) Converted line feeds in to DOS format so the script can be edited
@@ -883,6 +887,8 @@ class MapConstants :
             self.totestra = 0x8f3d2735334af # En Dotter's low on resources map 
 	elif selectionID == 5:
 	    self.totestra = 0x1fcdc6f76b8c1b# En Dotter's nearby starts map
+        elif selectionID == 6:
+            self.totestra = 0x1e52818fad64 # Atlixco
 
         #Number of tectonic plates
         self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
@@ -5527,7 +5533,7 @@ def getNumCustomMapOptionValues(argsList):
         elif optionID == OPTION_Wrap:
             return 4
         elif optionID == OPTION_MapSeed: # Map world
-            return 6
+            return 7
         elif optionID == OPTION_IslandFactor: # Number continents
             return 4
         elif optionID == OPTION_Patience: # Speed/quality tradeoff
@@ -5591,6 +5597,8 @@ def getCustomMapOptionDescAt(argsList):
 	    return "Preset #4 (En Dotter 1)"
 	elif selectionID == 5:
 	    return "Preset #5 (En Dotter 2)"
+        elif selectionID == 6:
+            return "Preset #6 (Atlixco)"
     elif optionID == OPTION_IslandFactor:
         if selectionID == 0:
             return "Few (faster)"
