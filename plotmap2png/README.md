@@ -1,7 +1,7 @@
 # Let's make a bunch of PNG files
 
 By using standard UNIX tools, along with Python 2, we can generate a large
-number of random worlds with the `TotestraRG32.py` script in the parent
+number of random worlds with the `Totestra.py` script in the parent
 directory:
 
 ```bash
