@@ -1,13 +1,13 @@
 #!/usr/bin/env python2
 ##############################################################################
-## File: TotestraStandAlone.py version 2019-07-08 (July 8, 2019)
+## File: Totestra.py version 2019-07-13 (July 13, 2019)
 ## This version uses the old "Perfect World" MT19937 random number
-## generator 
+## generator, but can also use RadioGatun[32] to make random numbers.
 
 ## It's possible to run this
 ## generator stand alone.  Make sure to have Python2 installed (yes, I know,
 ## but this generator is from the mid-first-2000s-decade), then type in
-## something like: python TotestraStandAlone.py 5
+## something like: python Totestra.py 5
 ## Note that, when run standalone, the map
 ## generator will generate a plot map then exit.  The map is all of the
 ## default options, which can not be changed (in particular, in the stand
@@ -18,6 +18,7 @@
 ## 2) We can now automate the generation of maps to better find really
 ##    good random worlds
 
+## 2019-08 Updates: Same script can use RG32 or MT19937; can run standalone
 ## 2018-07-14 Update: Update preset seeds to make good 3:2 maps
 ## 2018-07-04 Update: Make sure RG32 maps use different service tags
 ## than MT19937 maps, so there is no confusion.  Increase number of possible
