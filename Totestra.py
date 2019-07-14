@@ -6640,8 +6640,10 @@ if __name__ == "__main__":
     mc.UsePythonRandom = True
     try:
         arg1 = sys.argv[1]
+        mySeed = arg1
     except:
         arg1 = "8939185639133313" # Caulixtla
+        mySeed = "Caulixtla"
     if(arg1[0:1] == "T"):
         arg1 = arg1[1:]
         UseRG32 = True
@@ -6713,21 +6715,45 @@ if __name__ == "__main__":
     cm.createClimateMaps()
     sm.initialize()
     rm.generateRiverMap()
-    # Count the number of flood plain squares
+
+    # Scan the map and give the user a summary of the map
     floodPlainCount = 0
-    floodPlainList = {}
-    for x in range(144):
-        for y in range(96): 
-            i = (144 * y) + x 
+    tally = {}
+    bigAM = Areamap(mc.width,mc.height,True,True)
+    bigAM.defineAreas(isNonCoastWaterMatch)
+    maxLandAmount = -1
+    maxLandArea = -1
+    for x in range(mc.width):
+        for y in range(mc.height): 
+            i = (y * mc.width) + x 
+            #area = continentMap.areaMap.areaMap[i]
+            area = bigAM.areaMap[i]
+            if not area in tally:
+                tally[area] = {
+                    "Land": 0,
+                    "Desert": 0, 
+                    "floodPlains": 0, 
+                    "Tundra": 0
+                }
+            if sm.terrainMap[i] != mc.OCEAN and sm.terrainMap[i] != mc.COAST:
+                tally[area]["Land"] += 1
+                if(tally[area]["Land"] > maxLandAmount):
+                    maxLandAmount = tally[area]["Land"]
+                    maxLandArea = area
             if sm.terrainMap[i] == mc.DESERT:
+                tally[area]["Desert"] += 1
                 if rm.riverMap[i] != 5:
                     floodPlainCount += 1
-                    area = continentMap.areaMap.areaMap[i]
-                    try:
-                        floodPlainList[area] += 1
-                    except:
-                        floodPlainList[area] = 1
+                    tally[area]["floodPlains"] += 1
+            if sm.terrainMap[i] == mc.TUNDRA:
+                tally[area]["Tundra"] += 1
     print("Flood plain count: " + str(floodPlainCount))
-    for area in floodPlainList:
-        print("Flood plains in area " + str(area) + ": " + 
-              str(floodPlainList[area]))
+    for area in tally:
+        print("Tally for continent " + str(area) + ": " + 
+              str(tally[area]))
+    if(maxLandArea >= 0 and tally[maxLandArea]["Tundra"] < 10 and 
+       tally[maxLandArea]["floodPlains"] > 20 and 
+       tally[maxLandArea]["Desert"] > 500 and
+       tally[maxLandArea]["Land"] > 1000):
+        print("Nice land found seed " + mySeed)
+
