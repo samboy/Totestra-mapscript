@@ -2770,9 +2770,8 @@ class SmallMaps :
 
         self.createPlotMap()
         self.printPlotMap()
-        if not IsStandAlone:
-            self.createTerrainMap()
-            continentMap.generateContinentMap()
+        self.createTerrainMap()
+        continentMap.generateContinentMap()
 
     def fillInLakes(self):
         #smaller lakes need to be filled in again because the map
@@ -6669,7 +6668,7 @@ if __name__ == "__main__":
     mc.iceChance = 1.0
     mc.iceRange = 4
     mc.iceSlope = 0.66
-    if len(sys.argv) > 2: # Arid map
+    if len(sys.argv) < 2: # Arid map
         mc.DesertPercent = 0.40
         mc.PlainsPercent = 0.82
         mc.iceSlope = 0.33 # Less ice 
@@ -6697,6 +6696,8 @@ if __name__ == "__main__":
 
     mc.minimumMeteorSize = (1 + int(round(float(mc.hmWidth)/float(mc.width)))) * 3
     mc.patience = 2
+    mc.AllowNewWorld = True
+    mc.ShareContinent = True
     PRand.seed()
     hm.performTectonics()
     hm.generateHeightMap()
@@ -6711,3 +6712,22 @@ if __name__ == "__main__":
 ##    hm.printHeightMap()
     cm.createClimateMaps()
     sm.initialize()
+    rm.generateRiverMap()
+    # Count the number of flood plain squares
+    floodPlainCount = 0
+    floodPlainList = {}
+    for x in range(144):
+        for y in range(96): 
+            i = (144 * y) + x 
+            if sm.terrainMap[i] == mc.DESERT:
+                if rm.riverMap[i] != 5:
+                    floodPlainCount += 1
+                    area = continentMap.areaMap.areaMap[i]
+                    try:
+                        floodPlainList[area] += 1
+                    except:
+                        floodPlainList[area] = 1
+    print("Flood plain count: " + str(floodPlainCount))
+    for area in floodPlainList:
+        print("Flood plains in area " + str(area) + ": " + 
+              str(floodPlainList[area]))
