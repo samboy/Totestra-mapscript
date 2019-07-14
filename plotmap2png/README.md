@@ -8,7 +8,7 @@ directory:
 SEED=1
 while : ; do 
 	echo $SEED 
-	python2 ../Totestra.py $SEED arid > totestra-$SEED
+	python2 ../Totestra.py $SEED > totestra-$SEED
 	SEED=$(( $SEED + 1 ))
 done
 ```
