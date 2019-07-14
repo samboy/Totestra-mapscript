@@ -883,7 +883,7 @@ class MapConstants :
         mapRString = "Random"
         self.totestra = 0 
         if selectionID > 0 and UseRG32:
-            self.totestra = 285 # Interesting map
+            self.totestra = 2997 # Interesting map
         elif selectionID == 1: 
             self.totestra = 8885098498360902 # Totestra
         elif selectionID == 2: # Cephalo
@@ -6751,6 +6751,7 @@ if __name__ == "__main__":
     for area in tally:
         print("Tally for continent " + str(area) + ": " + 
               str(tally[area]))
+    print("Biggest is " + str(maxLandArea) + " with :"+str(tally[maxLandArea]))
     if(maxLandArea >= 0 and tally[maxLandArea]["Tundra"] < 10 and 
        tally[maxLandArea]["floodPlains"] > 30 and 
        tally[maxLandArea]["Desert"] > 500 and
