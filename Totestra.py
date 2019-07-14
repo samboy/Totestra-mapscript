@@ -6752,7 +6752,7 @@ if __name__ == "__main__":
         print("Tally for continent " + str(area) + ": " + 
               str(tally[area]))
     if(maxLandArea >= 0 and tally[maxLandArea]["Tundra"] < 10 and 
-       tally[maxLandArea]["floodPlains"] > 20 and 
+       tally[maxLandArea]["floodPlains"] > 30 and 
        tally[maxLandArea]["Desert"] > 500 and
        tally[maxLandArea]["Land"] > 1000):
         print("Nice land found seed " + mySeed)
