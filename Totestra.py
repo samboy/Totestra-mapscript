@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 ##############################################################################
-## File: Totestra.py version 2019-07-13 (July 13, 2019)
+## File: Totestra.py version 2019-07-28 (July 28, 2019)
 ## This version uses the old "Perfect World" MT19937 random number
 ## generator, but can also use RadioGatun[32] to make random numbers.
 
@@ -6670,7 +6670,7 @@ if __name__ == "__main__":
     mc.iceChance = 1.0
     mc.iceRange = 4
     mc.iceSlope = 0.66
-    if len(sys.argv) < 2: # Arid map
+    if len(sys.argv) <= 2: # Arid map
         mc.DesertPercent = 0.40
         mc.PlainsPercent = 0.82
         mc.iceSlope = 0.33 # Less ice 
