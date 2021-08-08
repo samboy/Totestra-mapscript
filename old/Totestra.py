@@ -1,16 +1,36 @@
+#!/usr/bin/env python2
 ##############################################################################
-## Totestra version 2021-08-07 (Totestra version 2)
-## Totestra 2 changes from PerfectWorld 2.06 (*not* 2.06f)
-## 1) Ability to select climate
-## 2) Ability to use fixed random seed
-## 3) Remove mountains next to coast (fix coastside mountain ring bug)
-## 4) Allow everyone to start on same landmass (biggest or 2nd biggest)
-## 5) Have options for changing resource distribution
-## 6) Note random seed on sign placed in the arctic
-## 7) Ability to have bigger (192x128) or smaller (96x64) maps
-##
-## File: PerfectWorld.py version 2.06
+## File: Totestra.py version 2019-07-28 (July 28, 2019)
+## This version uses the old "Perfect World" MT19937 random number
+## generator, but can also use RadioGatun[32] to make random numbers.
+
+## It's possible to run this
+## generator stand alone.  Make sure to have Python2 installed (yes, I know,
+## but this generator is from the mid-first-2000s-decade), then type in
+## something like: python Totestra.py 5
+## Note that, when run standalone, the map
+## generator will generate a plot map then exit.  The map is all of the
+## default options, which can not be changed (in particular, in the stand
+## alone mode, we only generate 144x96 huge medium patience world maps)
+## This allows us to make random worlds without needing Civilization IV
+## installed.  This has two benefits:
+## 1) People without Civilization IV can enjoy this map generator
+## 2) We can now automate the generation of maps to better find really
+##    good random worlds
+
+## 2019-08 Updates: Same script can use RG32 or MT19937; can run standalone
+## 2018-07-14 Update: Update preset seeds to make good 3:2 maps
+## 2018-07-04 Update: Make sure RG32 maps use different service tags
+## than MT19937 maps, so there is no confusion.  Increase number of possible
+## maps from 9007199254740992 to 95428956661682176; the preset seed
+## maps use different seeds and will never show up if random seed chosen
+## The service tag now has the literal base-26 string used as the map seed
+## (more RNGs should have support for string seeds)
+## Note: We use RagioGatun[32] instead of MT19937 for RNG
+## Note: This is a finished product.  
+## Original file: PerfectWorld.py version 2.06
 ## Author: Rich Marinaccio
+## Modified by Sam Trenholme; I am assigning all copyright to Rich
 ## Copyright 2007 Rich Marinaccio
 ##
 ## This map script for Civ4 generates a random, earth-like map, usually with a
@@ -56,6 +76,81 @@
 ##
 ##############################################################################
 ## Version History
+## Totestra - Sam Trenholme's update of PerfectWorld2.py
+##
+## 2017-03-30:
+## 1) Converted line feeds in to DOS format so the script can be edited
+##    in Notepad on Windows.  No other changes done.
+##
+## 2017-03-29:
+## 1) Update tropical climate done by q3max, see http://bit.ly/2oAKQSx
+##    for original patch
+##
+## 20120615:
+## 1) One-line bugfix for multi-player maps
+##
+## 20120612:
+## 1) Bugfix with rocky maps
+##
+## 20120603:
+## 1) The chance of a large continent splitting at the edge of the map
+##    has been greatly reduced
+## 2) There is now an option to remove coastal mountains and reduce inland
+##    mountains
+## 3) New map wrap option: PerfectWorld-compatible toric wrap
+## 4) All bits in the service tag are now used up.  I'm declaring Totestra
+##    finished.
+##
+## 20120530:
+## 1) Added 2-bit "parity" to service tag
+##
+## 20120527:
+## 1) Adding test case for bug reported by En Dotter
+##
+## 20120526:
+## 1) En Dotter feature request: It's now possible to change how the map
+##    distributes resources
+##
+## 20120524:
+## 1) New civ placement option: Have all civs placed on the same continent
+##
+## 20120523:
+## 1) New option: Handicap level.  This can give the human player extra
+##    starting resources.
+## 2) Options to split continents and to have players on the "new world"
+##    verified to work.
+##
+## 20120522:
+## 1) "Service tag" added as a sign in maps, so people who forgot to log
+##    Python debug information can still get full support.
+##
+## 20120521:
+## 1) Overhaul of selection code; symbolic names are now used instead of
+##    numbers
+## 2) Map ratios now can be selected (within reason)
+##
+## 20120519:
+## 1) Extra-slow maps disabled; they just put PerfectWorld in to an 
+##    infinite loop
+## 2) "Fast and cheap" maps tested; they work with all three preset 
+##    seeds so I'm declaring these maps stable.
+## 3) Iceberg code overhaul: Polar icebergs are now more common in cold 
+##    and/or large maps, and less common in smaller and/or warmer maps.
+##
+## 20120512:
+## 1) Faster lower-quality maps now tweaked and fixed.  "fast and dirty" caps
+##    the size: if you ask for huge you will get a medium sized map.
+## 2) Climate can now be selected and it affects the map
+## 3) Begin work on making the map ratio user-configurable
+##
+## 20120505: 
+## 1) Water level can now be adjusted in Civ4's GUI
+## 2) It is now possible to use a fixed or a random map seed
+## 3) There is an untested ability to more quickly make lower-quality maps,
+##    or, likewise, more slowly make better maps.
+##
+## Perfect World 2, Cephalo's original map generator changelog history:
+##
 ## 2.06 - Fixed a few bugs from my minimum hill/maximum bad feature function.
 ##
 ## 2.05 - Made maps of standard size and below a bit smaller. Changed the way I
@@ -163,9 +258,11 @@
 ## bugs that caused deserts to get out of control.
 ##
 
-from CvPythonExtensions import *
-import CvUtil
-import CvMapGeneratorUtil 
+IsStandAlone = False
+if __name__ != "__main__":
+    from CvPythonExtensions import *
+    import CvUtil
+    import CvMapGeneratorUtil 
 
 from array import array
 from random import random,randint,seed
@@ -174,80 +271,87 @@ import sys
 import time
 import os
 
+# Options
+OPTION_MapSeed = 10
+OPTION_NewWorld = 0
+OPTION_Pangaea = 1
+OPTION_Wrap = 2
+OPTION_IslandFactor = 3
+OPTION_Patience = 4
+OPTION_MapRatio = 5
+OPTION_MapResources = 6
+OPTION_Handicap = 7
+OPTION_NoRotate = 8
+OPTION_SmoothPeaks = 9
+OPTION_MAX = OPTION_MapSeed + 1 # Add 1 because it's 1-indexed
+# If this is set to "True" (no quotes), we will use RadioGatun[32] to 
+# make random numbers
+UseRG32 = False
+
+# Setting this to 1 will allow the buggy 1:2 ratio and the huge 6:4 ratio
+# these ratios have problems because of limitations in Civ 4's engine.  
+# You have been warned.
+ALLOW_EXTREME_RATIOS = 0
+
+# Setting this to 0 will make it so the map does not have a "Service Tag"
+# sign placed on it.  If the sign (which should be placed in an unusable
+# ice square, usually at the top of the map) annoys you, disabled this, but
+# heed this warning first:
+# I CAN NOT PROVIDE TECHNICAL ASSISTANCE WITHOUT A SERVICE TAG FOR YOUR
+# MAP.  DO NOT FILE A BUG REPORT OR ASK FOR TECHNICAL ASSISTANCE UNLESS YOU
+# HAVE A SERVICE TAG.
+ADD_SERVICE_TAG = 1
+
+# Quick and dirty 2-bit "party" of hex number
+def a91a15d7(x):
+        # a and b are 2-bit inputs for the s-box
+        # s is a 32-bit representation of this s-box
+        def sbox(a,b,s):
+                a &= 3
+                b &= 3
+                index = (a | (b << 2))
+                out = s
+                out >>= (index * 2)
+                out &= 3
+                return out
+
+        if x < 0:
+                return -1 # ERROR
+        out = 0
+        index = 0
+        while(x > 0):
+                q = (x & 3)
+                s = sbox(q,index,0xa91a15d7) # From RadioGatun[32] of "parity"
+                out += s
+                out ^= q
+                out &= 3
+                index += 1
+                index &= 3
+                x >>= 2
+        return out & 3
+
 class MapConstants :
     def __init__(self):
+        self.totestra = 0 
+        self.hmWidth  = 0
+        self.hmHeight = 0
+	self.noRotate = 0
+	self.smoothPeaks = 1
+        self.serviceFlags = 0 # Used for concise description of flags
+	self.xtraFlags = 0 # We're running out of bits :(
+	self.AllowPangeas = False
+	self.serviceString = "MP No Tag" # No cheating in multiplayer!
         return
     def initialize(self):
         print "Initializing map constants"
 ##############################################################################
 ## GLOBAL TUNING VARIABLES: Change these to customize the map results
-       
-        gc = CyGlobalContext()
-        mmap = gc.getMap()
-
-        # Default seed
-        self.randomSeed = 0
-
-        #Percent of land vs. water
-        self.landPercent = 0.29
-        
-        #If this variable is set to False, a shower of colossal meteors will attempt to
-        #break up any pangea-like continents. Setting this variable to True will allow
-        #pangeas to sometimes occur and should be greatly favored by any dinosaurs
-        #that might be living on this planet at the time.
-        self.AllowPangeas = False
-
-        #This variable can be used to turn off 'New world' logic and place starting
-        #positions anywhere in the world. For some mods, a new world doesn't make
-        #sense.
-        self.AllowNewWorld = True
-        self.ShareContinent = False
-        self.ShareContinentIndex = 1
-        
-        #How many land squares will be above peak threshold and thus 'peaks'.
-        self.PeakPercent = 0.12
-
-        #How many land squares will be above hill threshold and thus 'hills' unless
-        #they are also above peak threshold in which case they will be 'peaks'.
-        self.HillPercent = 0.35
-
-        #In addition to the relative peak and hill generation, there is also a
-        #process that changes flats to hills or peaks based on altitude. This tends
-        #to randomize the high altitude areas somewhat and improve their appearance.
-        #These variables control the frequency of hills and peaks at the highest altitude.
-        self.HillChanceAtOne = .50
-        self.PeakChanceAtOne = .27
-
-        #How many land squares will be below desert rainfall threshold. In this case,
-        #rain levels close to zero are very likely to be desert, while rain levels close
-        #to the desert threshold will more likely be plains.
-        self.DesertPercent = 0.20
-
-        #How many land squares will be below plains rainfall threshold. Rain levels close
-        #to the desert threshold are likely to be plains, while those close to the plains
-        #threshold are likely to be grassland. 
-        self.PlainsPercent = 0.42
         
         #---The following variables are not based on percentages. Because temperature
         #---is so strongly tied to latitude, using percentages for things like ice and
         #---tundra leads to very strange results if most of the worlds land lies near
         #---the equator
 
-        #What temperature will be considered cold enough to be ice. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.SnowTemp = .30
-
-        #What temperature will be considered cold enough to be tundra. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.TundraTemp = .35
-
-        #Hotter than this temperature will be considered deciduous forest, colder will
-        #be evergreen forest.Temperatures range from coldest 0.0 to hottest 1.0.
-        self.ForestTemp = .50
-
-        #What temperature will be considered hot enough to be jungle. Temperatures range
-        #from coldest 0.0 to hottest 1.0.
-        self.JungleTemp = .7
 
         #Sets the threshold for jungle rainfall by modifying the plains threshold by this factor.
         self.TreeFactor = 1.5
@@ -256,14 +360,6 @@ class MapConstants :
         #use a value between 0.0 and 1.0
         self.MaxTreeChance = 1.0
 
-        #This variable adjusts the amount of bonuses on the map. Values above 1.0 will add bonus
-        #bonuses. People often want lots of bonuses, and for those people, this variable is definately
-        #a bonus.
-        self.BonusBonus = 1.0
-        # This determines if we use Perfect World's way of spreading
-        # resources (False), or use a more normal resource distribution
-        self.spreadResources = False
-        
         #How many squares are added to a lake for each unit of drainage flowing
         #into it.
         self.LakeSizePerDrainage = 14.0
@@ -310,7 +406,7 @@ class MapConstants :
         self.polarFrontLatitude = 60
 
         #Tropics of Cancer and Capricorn plus and minus respectively
-        self.tropicsLatitude = 23
+        #self.tropicsLatitude = 23
 
         #Oceans are slow to gain and lose heat, so the max and min temps
         #are reduced and raised by this much.
@@ -327,21 +423,6 @@ class MapConstants :
         #matches geostrophic uplift.
         self.monsoonUplift = 500.0
         
-        #Height and Width of main climate and height maps. This does not
-        #reflect the resulting map size. Both dimensions( + 1 if wrapping in
-        #that dimension = False) must be evenly divisble by self.hmMaxGrain
-        # Note: The bigger map option may rewrite these values (see below)
-        self.hmWidth = 144
-        self.hmHeight = 97
-
-        #Controls wrapping (not sure if this makes sense yet)
-        self.WrapX = True
-        self.WrapY = False
-        
-        #Size of largest map increment to begin midpoint displacement. Must
-        #be a power of 2.
-        self.hmMaxGrain = 16
-
         #Option to divide map into two continents as far as the midpoint
         #displacement is concerned. For guaranteed continent separation, further
         #steps will be needed but this option will cause more ocean in the
@@ -372,9 +453,6 @@ class MapConstants :
         #will create more noise(bumpy), a smaller number will make less
         #noise(smooth).
         self.hmNoiseLevel = 2.0
-
-        #Number of tectonic plates
-        self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
 
         #Influence of the plate map, or how much of it is added to the height map.
         self.plateMapScale = 1.1
@@ -420,23 +498,6 @@ class MapConstants :
         #the initial large heightmap (mc.hmWidth, mc.hmHeight) before the
         #shrinking process
         self.minInlandSeaSize = 100
-        
-        #After generating the heightmap, bands of ocean can be added to the map
-        #to allow a more consistent climate generation. These bands are useful
-        #if you are generating part of a world where the weather might be coming
-        #in from off the map. These bands can be kept if needed or cropped off
-        #later in the process.
-        self.northWaterBand = 10
-        self.southWaterBand = 10
-        self.eastWaterBand = 0
-        self.westWaterBand = 0
-
-        #These variables are intended for use with the above water band variables
-        #but you can crop the map edge after climate generation for any reason.
-        self.northCrop = 10
-        self.southCrop = 10
-        self.eastCrop = 0
-        self.westCrop = 0
 
         #Too many meteors will simply destroy the Earth, and just
         #in case the meteor shower can't break the pangaea, this will also
@@ -473,17 +534,6 @@ class MapConstants :
         #value.
         self.RiverCityValueBonus = 1.2
         
-        #Bonus resources to add depending on difficulty settings
-        self.SettlerBonus = 0
-        self.ChieftainBonus = 0
-        self.WarlordBonus = 0
-        self.NobleBonus = 0
-        self.PrinceBonus = 1
-        self.MonarchBonus = 1
-        self.EmperorBonus = 2
-        self.ImmortalBonus = 2
-        self.DeityBonus = 3
-        
         #Decides whether to use the Python random generator or the one that is
         #intended for use with civ maps. The Python random has much higher precision
         #than the civ one. 53 bits for Python result versus 16 for getMapRand. The
@@ -492,44 +542,7 @@ class MapConstants :
         #syncing issues for multi-player now or in the future, therefore it must
         #be optional.
         self.UsePythonRandom = True        
-    
-        # T2 change: Add the ability to select climate
-        self.iceChance = 1.0 # Chance of having iceberg at top/bottom of map
-        self.iceRange = 4 # Number of squares we add icebergs to
-        self.iceSlope = 0.66 # How quickly we reduce icebergs
-        clim = mmap.getClimate()
-        if clim == 1: # Tropical
-            self.tropicsLatitude = 46
-            # q3max changes
-            self.DesertPercent = .10 # added
-            self.PlainsPercent = .30 # added
-            self.SnowTemp = .20 # added
-            self.TundraTemp = .30 # added
-            self.ForestTemp = .35 # added
-            self.JungleTemp = .50 # added
-            # End q3max changes
-            self.iceSlope = 0.33 # Less ice
-        elif clim == 2: # Arid
-            self.DesertPercent = 0.40
-            self.PlainsPercent = 0.82
-            self.iceSlope = 0.33 # Less ice
-        elif clim == 3: # Rocky
-            self.PeakPercent = 0.24
-            self.HillPercent = 0.70
-            self.HillChanceAtOne = 0.70
-            self.PeakChanceAtOne = 0.43
-            self.iceSlope = 0.75 # Some more ice
-            self.iceRange = 6
-        elif clim == 4: # Cold
-            self.tropicsLatitude = 0
-            self.SnowTemp = .50
-            self.TundraTemp = .75
-            self.ForestTemp = .85
-            self.JungleTemp = .99
-            self.iceRange = 12
-            self.iceChance = 1.2
-            self.iceSlope = 0.87 # Lots of ice
-
+        
         #Below here are static defines. If you change these, the map won't work.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.L = 0
@@ -546,9 +559,12 @@ class MapConstants :
         self.NORTH_SOUTH_SEPARATION = 1
         self.EAST_WEST_SEPARATION = 2
 
+        # THESE DO NOT CHANGE ANYTHING.  They are overwritten by
+        # mmap.getGridWidth() and mmap.getGridHeight()
         self.width = 104
         self.height = 64
 
+        # These should probably not be changed...
         self.OCEAN = 0
         self.LAND = 1
         self.HILLS = 2
@@ -570,70 +586,336 @@ class MapConstants :
     def initInGameOptions(self):
         gc = CyGlobalContext()
         mmap = gc.getMap()
+
+        # Sea level comes from preferences
+        try:
+            seaLevel = int(mmap.getSeaLevel())
+        except:
+            seaLevel = 1
+        self.landPercent = 0.29
+        if seaLevel == 0:
+            self.landPercent = 0.43
+        elif seaLevel == 2:
+            self.landPercent = 0.19
+
+        self.serviceFlags = 0 # Used for concise description of flags
+	if(seaLevel != 0):
+            self.serviceFlags |= (seaLevel & 3) # 2 bits; total 2
+	else:
+            self.serviceFlags |= 3 # Make sure Service Tag is always 21 digits
+      
+        # Have climate affect the maps 
+        # This is increased for a "tropical" climate
+        self.tropicsLatitude = 23
+ 
+        # These are increased for "rocky" climates
+        #How many land squares will be above peak threshold and thus 'peaks'.
+        self.PeakPercent = 0.12
+
+        #How many land squares will be above hill threshold and thus 'hills' 
+        #unless hey are also above peak threshold in which case they will 
+        #be 'peaks'.
+        self.HillPercent = 0.35
+        
+        #In addition to the relative peak and hill generation, there is also a
+        #process that changes flats to hills or peaks based on altitude. This tends
+        #to randomize the high altitude areas somewhat and improve their appearance.
+        #These variables control the frequency of hills and peaks at the highest altitude.
+        self.HillChanceAtOne = .50
+        self.PeakChanceAtOne = .27
+
+        #How many land squares will be below desert rainfall threshold. In this case,
+        #rain levels close to zero are very likely to be desert, while rain levels close
+        #to the desert threshold will more likely be plains.
+        self.DesertPercent = 0.20
+
+        #How many land squares will be below plains rainfall threshold. Rain levels close
+        #to the desert threshold are likely to be plains, while those close to the plains
+        #threshold are likely to be grassland. 
+        self.PlainsPercent = 0.42
+        
+        #What temperature will be considered cold enough to be ice. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.SnowTemp = .30
+
+        #What temperature will be considered cold enough to be tundra. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.TundraTemp = .35
+
+        #Hotter than this temperature will be considered deciduous forest, colder will
+        #be evergreen forest.Temperatures range from coldest 0.0 to hottest 1.0.
+        self.ForestTemp = .50
+
+        #What temperature will be considered hot enough to be jungle. Temperatures range
+        #from coldest 0.0 to hottest 1.0.
+        self.JungleTemp = .7
+
+        # Temperate: 0 Tropical: 1 Arid: 2 Rocky: 3 Cold: 4
+        self.iceChance = 1.0 # Chance of having iceberg at top/bottom of map
+        self.iceRange = 4 # Number of squares we add icebergs to
+        self.iceSlope = 0.66 # How quickly we reduce icebergs
+        clim = mmap.getClimate() 
+        if clim == 1: # Tropical
+            self.tropicsLatitude = 46
+            # q3max changes
+            self.DesertPercent = .10 # added
+            self.PlainsPercent = .30 # added
+            self.SnowTemp = .20 # added
+            self.TundraTemp = .30 # added
+            self.ForestTemp = .35 # added
+            self.JungleTemp = .50 # added
+            # End q3max changes
+	    self.iceSlope = 0.33 # Less ice
+        elif clim == 2: # Arid
+            self.DesertPercent = 0.40
+            self.PlainsPercent = 0.82
+	    self.iceSlope = 0.33 # Less ice
+        elif clim == 3: # Rocky
+            self.PeakPercent = 0.24
+            self.HillPercent = 0.70
+            self.HillChanceAtOne = 0.70
+            self.PeakChanceAtOne = 0.43
+	    self.iceSlope = 0.75 # Some more ice
+            self.iceRange = 6
+        elif clim == 4: # Cold
+            self.tropicsLatitude = 0
+            self.SnowTemp = .50
+            self.TundraTemp = .75
+            self.ForestTemp = .85
+            self.JungleTemp = .99
+            self.iceRange = 12
+            self.iceChance = 1.2
+	    self.iceSlope = 0.87 # Lots of ice
+        
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (clim & 7) # 3 bits; total 5
+      
         #New World Rules
-        selectionID = mmap.getCustomMapOption(0)
+        selectionID = mmap.getCustomMapOption(OPTION_NewWorld)
+        self.AllowNewWorld = True
+	self.ShareContinent = False
         if selectionID == 1:
-            self.AllowNewWorld = not self.AllowNewWorld
-        if selectionID == 2: # Everyone on same landmass (largest)
-            self.AllowNewWorld = True
-            self.ShareContinent = True
-        if selectionID == 3: # Everyone on same landmass (second largest)
-            self.AllowNewWorld = True
-            self.ShareContinent = True
-            self.ShareContinentIndex = 2
+            self.AllowNewWorld = False
+	elif selectionID == 2:
+	    self.ShareContinent = True
+
+	self.xtraFlags = 0
+	self.xtraFlags |= ((self.ShareContinent & 1) << 4)
+
+        self.serviceFlags <<= 1
+        self.serviceFlags |= (self.AllowNewWorld & 1) # 1 bit; total 6
+
         #Pangaea Rules
-        selectionID = mmap.getCustomMapOption(1)
+        selectionID = mmap.getCustomMapOption(OPTION_Pangaea)
+        self.AllowPangeas = False
         if selectionID == 1:
-            self.AllowPangeas = not self.AllowPangeas
+            self.AllowPangeas = True
 
-        # Bigger maps option
-        selectionID = mmap.getCustomMapOption(4)
-        # Default size is 144 wide, 97 tall
-        if selectionID == 1: # Big maps
-            self.hmHeight = 129
-            self.hmWidth = 192
-        elif selectionID == 2: # Small maps
-            self.hmHeight = 65
-            self.hmWidth = 96
-            self.hmNumberOfPlates = (int(
-                     float(self.hmWidth * self.hmHeight) * 0.0016))
+        self.serviceFlags <<= 1
+        self.serviceFlags |= (self.AllowPangeas & 1) # 1 bit; total 7
 
+        # How long are they willing to wait for the map to be made
+        patience = mmap.getCustomMapOption(OPTION_Patience)
+        patience += 1 # Patience at 0 is broken
+
+	# This allows me to have one final usable bit in the service tag
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (patience & 3) # 2 bits; total 10
+
+        # The preset worlds have hard-coded values
+        selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
+
+        # Disabled: we will only alter seed (it's now for debugging)
+        #if selectionID != 0:
+            #patience = 2
+            #if selectionID != 3:
+            #    self.landPercent = 0.29 # We will force this here too
+
+        self.patience = patience
+        #Size of largest map increment to begin midpoint displacement. Must
+        #be a power of 2.
+        self.hmMaxGrain = 2 ** (2 + patience)
+
+        #Height and Width of main climate and height maps. This does not
+        #reflect the resulting map size. Both dimensions( + 1 if wrapping in
+        #that dimension = False) must be evenly divisble by self.hmMaxGrain
+        # SAM:
+        # Make it easy to change the size while keeping the aspect ratio
+        # The bigger the size factor, the smaller the continents and the
+        # slower the map generation process
+
+        # X and Y values for the map's aspect ratio
+	ratioValue = mmap.getCustomMapOption(OPTION_MapRatio)
+	if 1 == 2: # Dummy, does nothing, so we don't get elif problems
+		self.ratioX = 3
+		self.ratioY = 2
+        elif ratioValue == 0: # 2:3
+		self.ratioX = 2
+		self.ratioY = 3
+        elif ratioValue == 1: # 1:1
+		self.ratioX = 2
+		self.ratioY = 2
+	elif ratioValue == 2: # 3:2
+		self.ratioX = 3
+		self.ratioY = 2
+	elif ratioValue == 3: # 2:1
+		self.ratioX = 4
+		self.ratioY = 2
+	elif ratioValue == 4: # 7:1, Ringworld 
+		self.ratioX = 7
+		self.ratioY = 1
+	elif ratioValue == 5: # 3:3, Big square (untested)
+		self.ratioX = 3
+		self.ratioY = 3
+	elif ratioValue == 6: # 3:2 but twice the size
+		self.ratioX = 6
+		self.ratioY = 4
+        elif ratioValue == 7: # 1:2; down here because it's buggy
+		self.ratioX = 2
+		self.ratioY = 4
+
+	if patience < 2:
+        	self.ratioX = 3 # One less thing to SQA
+        	self.ratioY = 2
+
+        self.serviceFlags <<= 3
+        self.serviceFlags |= (ratioValue & 7) # 3 bits; total 13
+
+        selectionID = mmap.getCustomMapOption(OPTION_IslandFactor)
+
+        self.serviceFlags <<= 2
+        self.serviceFlags |= (selectionID & 3) # Island factor
+
+	# If they want a fast map, don't allow them to select more islands
+	if(patience < 2):
+		selectionID = 0
+
+        heightmap_size_factor = 3 + selectionID
+        self.hmWidth  = (self.hmMaxGrain * self.ratioX * 
+                         heightmap_size_factor)
+        self.hmHeight = (self.hmMaxGrain * self.ratioY * 
+                         heightmap_size_factor) + 1
+
+        # These are expressed in 4x4 "Grid" units
+        self.maxMapWidth = int(self.hmWidth / 4)
+        self.maxMapHeight = int(self.hmHeight / 4)
+         
         #Wrap options
-        selectionID = mmap.getCustomMapOption(2)
+        selectionID = mmap.getCustomMapOption(OPTION_Wrap)
         wrapString = "Cylindrical"
-        if selectionID == 1: #Toroidal
+	self.WrapX = True
+	self.WrapY = False
+
+        self.serviceFlags <<= 2 
+        self.serviceFlags |= (selectionID & 3) # Map wrap; 2 bits total 15
+        self.serviceFlags <<= 6 # 6 bits so we know the map size total 21
+
+	# handicap of 0 means player is equal to AI and may get a 
+	# starting position that can not be won at higher difficulty
+	# settings.  Values of 1, 2, or 3 make it easier for the player
+	handicap = mmap.getCustomMapOption(OPTION_Handicap)
+	self.xtraFlags |= ((handicap & 3) << 5)
+	
+        #Bonus resources to add depending on difficulty settings
+        self.SettlerBonus = handicap
+        self.ChieftainBonus = handicap 
+        self.WarlordBonus = handicap 
+        self.NobleBonus = handicap 
+        self.PrinceBonus = handicap 
+        self.MonarchBonus = handicap 
+        self.EmperorBonus = handicap 
+        self.ImmortalBonus = handicap 
+        self.DeityBonus = handicap 
+       
+	# Now that we have calculated the player's bonus resources, how many
+	# resources should the map as a whole have? 
+
+        #This variable adjusts the amount of bonuses on the map. Values above 1.0 will add bonus
+        #bonuses. People often want lots of bonuses, and for those people, this variable is definately
+        #a bonus.
+        self.BonusBonus = 1.0
+	self.spreadResources = False 
+	bonus_add = mmap.getCustomMapOption(OPTION_MapResources)
+	if bonus_add == 1: # More evenly spread out
+		self.BonusBonus = 0.7 # Compensate for spread's increase
+		self.spreadResources = True # Increases resources
+	if bonus_add == 2: # Full of resources
+		self.BonusBonus = 1.5 # Increases resources
+		self.spreadResources = True # Increases resources more
+	self.xtraFlags |= ((bonus_add & 3) << 2)
+       
+        self.noRotate = mmap.getCustomMapOption(OPTION_NoRotate)
+	self.smoothPeaks = mmap.getCustomMapOption(OPTION_SmoothPeaks)
+ 
+        #After generating the heightmap, bands of ocean can be added to the map
+        #to allow a more consistent climate generation. These bands are useful
+        #if you are generating part of a world where the weather might be coming
+        #in from off the map. These bands can be kept if needed or cropped off
+        #later in the process.
+        self.northWaterBand = 10
+        self.southWaterBand = 10
+        self.eastWaterBand = 0
+        self.westWaterBand = 0
+        #These variables are intended for use with the above water band variables
+        #but you can crop the map edge after climate generation for any reason.
+        self.northCrop = 10
+        self.southCrop = 10
+        self.eastCrop = 0
+        self.westCrop = 0
+
+        if selectionID == 1 or selectionID == 3: #Toroidal
             self.hmHeight -= 1
             self.WrapY = True
+	    if selectionID == 1:
+                self.iceChance *= 0.1
             self.northWaterBand = 0
             self.northCrop = 0
             self.southWaterBand = 0
             self.southCrop = 0
             wrapString = "Toroidal"
-            
         elif selectionID == 2: #Flat
             self.hmWidth += 1
             self.WrapX = False
             wrapString = "Flat"
-          
-        # How we distribute resources
-        selectionID = mmap.getCustomMapOption(3)
-        if selectionID == 0:
-            self.BonusBonus = 1.5 # Increases resources
-            self.spreadResources = True
-        elif selectionID == 1: # Evenly spaced resources
-            self.BonusBonus = 0.7 
-            self.spreadResources = True
-        elif selectionID == 2: # Like Perfect World
-            self.BonusBonus = 1.0 
-            self.spreadResources = False
-        else:
-            self.BonusBonus = 1.5 # Increases resources
-            self.spreadResources = True
+       
+        # Random seed options (fixed or random)
+        selectionID = mmap.getCustomMapOption(OPTION_MapSeed)
+        mapRString = "Random"
+        self.totestra = 0 
+        if selectionID > 0 and UseRG32:
+            self.totestra = 2997 # Interesting map
+        elif selectionID == 1: 
+            self.totestra = 8885098498360902 # Totestra
+        elif selectionID == 2: # Cephalo
+            self.totestra = 4316490043753041 # Cephalo 
+        elif selectionID == 3: 
+            self.totestra = 8939185639133313 # Caulixtla 
+	elif selectionID == 4: 
+            self.totestra = 0x8f3d2735334af
+	elif selectionID == 5:
+	    self.totestra = 0x1fcdc6f76b8c1b
+	elif selectionID == 6:
+	    self.totestra = 0x1e52818fad64 # Atlixco
+        elif selectionID > 0:
+            self.totestra = 8939185639133313 # Caulixtla
 
-        # Do we use a fixed or random map seed?
-        selectionID = mmap.getCustomMapOption(5)
-        if selectionID == 1: # Fixed random seed
-            self.randomSeed = 8939185639133313
+        #Number of tectonic plates
+        self.hmNumberOfPlates = int(float(self.hmWidth * self.hmHeight) * 0.0016)
+        if patience == 0:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0032)
+        elif patience == 1:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0024)
+        elif patience == 3:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0008)
+        elif patience == 4:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0004)
+        elif patience >= 5:
+            self.hmNumberOfPlates = int(
+                float(self.hmWidth * self.hmHeight) * 0.0002)
 
         self.optionsString = "Map Options: \n"
         if self.AllowNewWorld:
@@ -645,11 +927,217 @@ class MapConstants :
         else:
             self.optionsString += "AllowPangeas = false\n"
         self.optionsString += "Wrap Option = " + wrapString + "\n"
+        self.optionsString += "Map world = " + mapRString + "\n" 
+        self.optionsString += "Land percent = " + str(self.landPercent) + "\n"
+        self.optionsString += "RatioX = " + str(self.ratioX) + "\n"
+        self.optionsString += "RatioY = " + str(self.ratioY) + "\n"
+        self.optionsString += "Climate = " + str(clim) + "\n"
+        self.optionsString += "Patience = " + str(patience) + "\n"
+        self.optionsString += "Island factor = " + str(heightmap_size_factor) +"\n" 
 
+        print str(self.optionsString) + "\n" 
         return
     
-mc = MapConstants()
 
+# Class RadioGatun32 is under different copyright:
+# Copyright (c) 2012-2017 Sam Trenholme
+# 
+# TERMS
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# This software is provided 'as is' with no guarantees of correctness or
+# fitness for purpose.
+
+# This is a Python implementation of RadioGatun32.  It takes about 10
+# seconds to set up the RNG, then it can output approximately
+# 30,000 16-bit random numbers per second on a Core i5-2430M
+
+# There is another open-source Python RadioGatun implementation here:
+# https://github.com/doegox/python-cryptoplus
+
+# I would like to thank Lorenzo for his suggestion to use xrange to speed up
+# the program
+
+class RadioGatun32:
+	def __init__(self, m):
+		self.wordsize = 32
+		self.millsize = 19
+		self.beltrows = 3
+		self.beltcol = 13
+		self.beltfeed = 12
+		self.mask = 0xffffffff # 32-bit
+		self.index = 0
+		(self.a, self.b) = self.seed(str(m))
+	def mill(self,a):
+		aa = []
+		for g in xrange(self.millsize):
+			aa.append(0)
+		x = 0
+		i = 0
+		y = 0
+		r = 0
+		z = 0
+		for i in xrange(self.millsize):
+			y = (i * 7) % self.millsize
+			r = ((i * (i + 1)) / 2) % self.wordsize
+			x = a[y] ^ (a[ ((y + 1) % self.millsize) ] |
+			    (a[ ((y + 2) % self.millsize) ] ^ self.mask))
+			aa[i] = ((x >> r) | (x << (self.wordsize - r))
+			        & self.mask)
+		for i in xrange(self.millsize):
+			y = i
+			r = (i + 1) % self.millsize
+			z = (i + 4) % self.millsize
+			a[i] = aa[y] ^ aa[r] ^ aa[z]
+		a[0] ^= 1
+		return a
+	def belt(self,a,b):
+		q = []
+		for g in xrange(self.beltrows):
+			q.append(0)
+		s = 0	
+		i = 0
+		v = 0
+		for s in xrange(self.beltrows):
+			q[s] = b[((s * self.beltcol) + self.beltcol - 1)]
+		i = self.beltcol - 1
+		while i > 0:
+			for s in xrange(self.beltrows):
+				v = i - 1
+				if v < 0:
+					v = self.beltcol - 1
+				b[((s * self.beltcol) + i)] = (
+					b[((s * self.beltcol) + v)])
+			i -= 1
+		for s in xrange(self.beltrows):
+			b[(s * self.beltcol)] = q[s]
+		for i in xrange(self.beltfeed):
+			s = (i + 1) + ((i % self.beltrows) * self.beltcol)
+			b[s] ^= a[(i + 1)]
+		a = self.mill(a)
+		for i in xrange(self.beltrows):
+			a[(i + self.beltcol)] ^= q[i]
+		return (a, b)
+	def seed(self,m):
+		p = []
+		for g in xrange(3):
+			p.append(0)
+		q = 0
+		c = 0
+		r = 0
+		done = 0
+		index = 0
+		counter = 0
+		a = []
+		b = []
+		for g in xrange(self.millsize):
+			a.append(0)
+		for g in xrange(self.beltrows * self.beltcol):
+			b.append(0)
+		for counter in xrange(16777218): # Infinite loop protection
+			p[0] = p[1] = p[2] = 0
+			for r in xrange(3):
+				q = 0
+				while q < self.wordsize:
+					x = 0
+					try:
+						x = ord(m[index])
+					except:
+						x = 1
+					index += 1
+					if(index > len(m)):
+						done = 1
+						x = 1
+					p[r] |= x << q
+					if done == 1:
+						for c in xrange(3):
+							b[c * 13] ^= p[c]
+							a[16 + c] ^= p[c]
+						(a,b) = self.belt(a,b)
+						for c in xrange(16):	
+							(a,b) = self.belt(a,b)
+						return (a,b)
+					q += 8
+			for c in xrange(3):
+				b[c * 13] ^= p[c]
+				a[16 + c] ^= p[c]
+			(a,b) = self.belt(a,b)
+		return (a,b) # We should never get here
+	# Return 16-bit random integer (between 0 and 65535)
+	def rng16(self):
+		if (self.index % 4) == 0:
+			(self.a, self.b) = self.belt(self.a, self.b)
+			self.index += 1
+			return (((self.a[1] & 0xff) << 8) | 
+				 ((self.a[1] & 0xff00) >> 8))
+		self.index += 1
+		if (self.index % 4) == 2:
+			return(((self.a[1] & 0xff0000) >> 8) |
+				((self.a[1] & 0xff000000) >> 24))
+		elif (self.index % 4) == 3:
+			return(((self.a[2] & 0xff) << 8) |
+				((self.a[2] & 0xff00) >> 8))
+		elif (self.index % 4) == 0:
+			return(((self.a[2] & 0xff0000) >> 8) |
+				((self.a[2] & 0xff000000) >> 24))
+		else: # Should never get here
+			return -1
+	# Return 32-bit random integer
+	def rng32(self):
+		if(self.index & 1):
+			self.index += 1
+		self.index &= 2
+		if(self.index):
+			self.index = 0
+			return (((self.a[2] & 0xff) << 24) |
+				((self.a[2] & 0xff000000) >> 24) |
+				((self.a[2] & 0xff00) << 8) |
+				((self.a[2] & 0xff0000) >> 8))
+		(self.a, self.b) = self.belt(self.a, self.b)
+		self.index = 2
+		return (((self.a[1] & 0xff) << 24) |
+			((self.a[1] & 0xff000000) >> 24) |
+			((self.a[1] & 0xff00) << 8) |
+			((self.a[1] & 0xff0000) >> 8))
+	# Return 64-bit random integer
+	def rng64(self):
+		left = self.rng32()
+		right = self.rng32()
+		return ((left << 32) | right)
+	# Return number between 0 (can be 0) and 1 (can be slightly smaller
+	# than 1 but never 1)
+	def random(self):
+		return float(self.rng64()) / 18446744073709551616
+	# Return a number between a and b
+	def randint(self, low, high):
+		if(low == high):
+			return low
+		if(high < low):
+			swap = low
+			low = high
+			high = swap
+		range = 1 + high - low	
+		# For low ranges, we can use 16-bit ints to get number
+		if(range <= 10000):
+			max = 65536 - (65536 % range)
+			number = max
+			while number >= max:
+				number = self.rng16()
+			return low + (number % range)
+		# int() returns the floor, e.g. int(1.99999) returns 1
+		return int(low + (self.random() * range))
+##### END BSD LICENSED CODE ##############################################
+
+mc = MapConstants()
 class PythonRandom :
     def __init__(self):
         return
@@ -659,25 +1147,49 @@ class PythonRandom :
             self.usePR = True
         else:
             self.usePR = False
-        if self.usePR and CyGame().isNetworkMultiPlayer():
+        if not IsStandAlone and self.usePR and CyGame().isNetworkMultiPlayer():
             print "Detecting network game. Setting UsePythonRandom to False."
             self.usePR = False
         if self.usePR:
             # Python 'long' has unlimited precision, while the random generator
             # has 53 bits of precision, so I'm using a 53 bit integer to seed the map!
             seed() #Start with system time
-            seedValue = randint(0,9007199254740991)
-            if mc.randomSeed == 0:
-                seed(seedValue)
-                mc.randomSeed = seedValue
+            if UseRG32:
+                if(mc.totestra == 0):
+                    seedValue = "R"
+                    seedletter="abcdefghijkl7nopqrstuv8xyz" # No wide letters
+                    for seedMake in range(10):
+                        seedMe = randint(0,25)
+                        seedValue += seedletter[seedMe:seedMe+1]
+                    self.seedString = "Random seed (Using Python rands) for this map is " + seedValue
+                else:
+                    seedValue = "RT" + str(mc.totestra)
+                    self.seedString = "Fixed seed (Using Python rands) for this map is " + seedValue
+	        mc.serviceTag = 0
             else:
-                seed(mc.randomSeed)
-                seedValue = mc.randomSeed
-            self.seedString = "Random seed (Using Python rands) for this map is %(s)20d" % {"s":seedValue}
-            
-##            seedValue = 4316490043753041
-##            seed(seedValue)
-##            self.seedString = "Pre-set seed (Using Pyhon rands) for this map is %(s)20d" % {"s":seedValue}     
+                if(mc.totestra == 0):
+                    seedValue = randint(0,9007199254740991)
+                    self.seedString = "Random seed (Using Python rands) for this map is %(s)20d" % {"s":seedValue}
+                else:
+                    seedValue = mc.totestra
+                    self.seedString = "Fixed seed (Using Python rands) for this map is %(s)20d" % {"s":seedValue}
+	        mc.serviceTag = (seedValue & 0xffffffffffffff)
+	    mc.serviceTag |= (mc.serviceFlags << 60)
+	    mc.serviceTag |= (mc.xtraFlags << 53)
+	    if(mc.noRotate == 0):
+		mc.serviceTag |= (1 << 83)
+	    if(mc.smoothPeaks == 1):
+		mc.serviceTag |= (1 << 75)
+	    mc.serviceTag |= (a91a15d7(mc.serviceTag) << 53)
+            if UseRG32:
+                mc.serviceTag >>= 52
+                mc.serviceString = ("%x" % mc.serviceTag)
+                mc.serviceString += seedValue
+                self.rg32 = RadioGatun32(seedValue)
+            else:
+	        mc.serviceString = ("%x" % mc.serviceTag)
+                seed(seedValue)
+            print "SERVICE TAG: " + mc.serviceString 
         else:
             gc = CyGlobalContext()
             self.mapRand = gc.getGame().getMapRand()
@@ -690,11 +1202,14 @@ class PythonRandom :
 ##            self.mapRand.init(seedValue)
 ##            self.seedString = "Pre-set seed (Using getMapRand) for this map is %(s)20d" % {"s":seedValue}
             
-        print self.seedString
+	print str(self.seedString)
         return
     def random(self):
         if self.usePR:
-            return random()
+            if UseRG32:
+                return self.rg32.random()
+            else:
+                return random()
         else:
             #This formula is identical to the getFloat function in CvRandom. It
             #is not exposed to Python so I have to recreate it.
@@ -707,7 +1222,10 @@ class PythonRandom :
             return rMin
         #returns a number between rMin and rMax inclusive
         if self.usePR:
-            return randint(rMin,rMax)
+            if UseRG32:
+                return self.rg32.randint(rMin,rMax)
+            else:
+                return randint(rMin,rMax)
         else:
             #mapRand.get() is not inclusive, so we must make it so
             return rMin + self.mapRand.get(rMax + 1 - rMin,"Getting a randint - FairWeather.py")
@@ -734,7 +1252,7 @@ def errorPopUp(message):
                 popupInfo.addPythonButton("Ok","")
                 popupInfo.addPopup(iPlayer)
                 
-#This function converts x and y to an index.
+#This function converts x and y to a one-dimensional index.
 def GetIndex(x,y):
     #Check X for wrap
     if mc.WrapX == True:
@@ -754,6 +1272,7 @@ def GetIndex(x,y):
     i = yy * mc.width + xx
     return i
 
+# This does the same thing for the height map (as opposed to the plot map)
 def GetHmIndex(x,y):
     #Check X for wrap
     if mc.WrapX == True:
@@ -793,7 +1312,6 @@ def GetIndexGeneral(x,y,width,height):
     i = yy * width + xx
     return i
 
-
 #This function scales a float map so that all values are between
 #0.0 and 1.0.
 def NormalizeMap(fMap,width,height):
@@ -820,8 +1338,26 @@ def NormalizeMap(fMap,width,height):
         for x in range(width):
             fMap[GetIndexGeneral(x,y,width,height)] = fMap[GetIndexGeneral(x,y,width,height)] * scaler              
     return
+
+# This takes a large map and scales it to make it smaller
 def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
+
     smallMap = array('d')
+    for y in range(sHeight):
+        for x in range(sWidth):
+	    smallMap.append(0)
+
+    # If the "small" map is, in fact, bigger, repeat the "large" map
+    # This looks **REALLY BAD** and should not be done
+    if(sWidth > lWidth and sHeight > lHeight):
+        for x in range(sWidth):
+	    for y in range(sHeight):
+	        smallMap[GetIndexGeneral(x,y,sWidth,sHeight)] = (
+	    	 largeMap[GetIndexGeneral(x % lWidth,y % lHeight, 
+		 lWidth, lHeight)])
+        return smallMap
+
+    #Scale down a large map down to a small map
     yScale = float(lHeight)/float(sHeight)
     xScale = float(lWidth)/float(sWidth)
     for y in range(sHeight):
@@ -849,9 +1385,13 @@ def ShrinkMap(largeMap,lWidth,lHeight,sWidth,sHeight):
                     weights += weight
                     contributors += weight * contributor
 ##            print " final height = %f" % (contributors/weights)        
-            smallMap.append(contributors/weights)
+            #smallMap.append(contributors/weights)
+	    smallMap[GetIndexGeneral(x,y,sWidth,sHeight)] = (
+	    	contributors/weights)
+            #smallMap.append(contributors/weights)
                     
     return smallMap
+
 def GetWeight(x,y,xx,yy,xScale,yScale):
     xWeight = 1.0
 ##    print "   xScale = %f" % xScale
@@ -1108,7 +1648,7 @@ class HeightMap :
             ok = False
 
         if ok == False:
-            raise ValueError, "height map dimesions not divisible by mc.hmMaxGrain. also check wrapping options"
+            raise ValueError, ("height map dimesions not divisible by mc.hmMaxGrain. also check wrapping options Width %d Height %d w %d h %d %s %s" % (mc.hmWidth , mc.hmHeight, width, height, str(mc.WrapX), str(mc.WrapY)))
             
         return
 
@@ -1498,6 +2038,40 @@ class HeightMap :
 
         NormalizeMap(self.heightMap,mc.hmWidth,mc.hmHeight)
 
+    def rotateMap(self):
+
+	if mc.noRotate != 0:
+		return
+
+        # This rotates a map east or west so that the map wraps around where
+        # the lowest vertical band is on the map
+	low = 0
+	min = 10000.0
+
+	# Find the place on the map with the most water (lowest heightfield)
+        for x in range(mc.hmWidth):
+		sum = 0.0
+		for y in range(mc.hmHeight):
+			sum += self.heightMap[GetHmIndex(x,y)]
+		#print "for x %d sum is %f min %f" % (x,sum,min)
+		if(sum < min):
+			low = x
+			min = sum
+	#print "low x is %d" % (low) #DEBUG
+	
+	# Rotate the height map so we wrap where there is more water
+	for y in range(mc.hmHeight):
+		tempStripe = []
+		for x in range(mc.hmWidth):
+			tempStripe.append(self.heightMap[GetHmIndex(x,y)])
+		for x in range(mc.hmWidth):
+			self.heightMap[GetHmIndex(x,y)] = tempStripe[
+				((x + low) % mc.hmWidth)]
+
+	# Done
+	return
+
+
     def addWaterBands(self):
         #validate water bands. Maps that wrap cannot have one in that direction
         if mc.WrapX and (mc.eastWaterBand != 0 or mc.westWaterBand != 0):
@@ -1524,6 +2098,14 @@ class HeightMap :
         self.heightMap = newHeightMap
         
     def calculateSeaLevel(self):
+        if mc.patience == 0:
+            mc.landPercent *= 2
+            if mc.landPercent > 1:
+                mc.landPercent = 1
+        if mc.patience == 1:
+            mc.landPercent *= 1.5
+            if mc.landPercent > 1:
+                mc.landPercent = 1
         self.seaLevel = FindValueFromPercent(self.heightMap,mc.hmWidth,mc.hmHeight,mc.landPercent,0.02,True)
         return
     
@@ -1968,6 +2550,7 @@ class ClimateMap :
             for x in range(mc.hmWidth):
                 tempMap.append(self.getInitialTemp(x,y,tropic))
         return
+
     def getInitialTemp(self,x,y,tropic):
         i = GetHmIndex(x,y)
         lat = self.getLatitude(y)
@@ -2176,6 +2759,7 @@ class SmallMaps :
                     self.averageTempMap.append(0.0)
 
         #Smooth coasts so there are fewer hills on coast
+	# (This might make deep ocean difficult to implement)
         for y in range(mc.height):
             for x in range(mc.width):
                 if self.isBelowSeaLevel(x,y):
@@ -2295,7 +2879,7 @@ class SmallMaps :
         for y in range(mc.height):
             for x in range(mc.width):
                 i = GetIndex(x,y)
-                if self.plotMap[i] == mc.HILLS:
+                if self.plotMap[i] == mc.HILLS and mc.smoothPeaks == 1:
                     allHills = True
                     for direction in range(1,9,1):
                         xx,yy = GetXYFromDirection(x,y,direction)
@@ -2304,21 +2888,26 @@ class SmallMaps :
                             allHills = False
                     if allHills == True:
                         self.plotMap[i] = mc.LAND
-                if self.plotMap[i] == mc.PEAK:
+                if self.plotMap[i] == mc.PEAK and mc.smoothPeaks == 1:
                     allPeaks = True
-                    peakCount = 0
-                    nextToOcean = False
+		    peakCount = 0
+		    nextToOcean = False
+		    #print "peak at %d %d" % (x,y) #DEBUG
+		    # While we're here, let's eliminate seaside peaks
                     for direction in range(1,9,1):
                         xx,yy = GetXYFromDirection(x,y,direction)
                         ii = GetIndex(xx,yy)
                         if self.plotMap[ii] != mc.PEAK:
                             allPeaks = False
-                        else:
-                            peakCount += 1
+			else:
+			    peakCount += 1
                         if self.plotMap[ii] == mc.OCEAN:
+			    #print "nextToOcean %d %d" % (x,y) #DEBUG
                             nextToOcean = True
-                    if allPeaks == True or peakCount>3 or nextToOcean == True:
+                    if allPeaks == True or peakCount > 3:
                         self.plotMap[i] = mc.HILLS
+		    if nextToOcean == True:
+			self.plotMap[i] = mc.HILLS
         
         return
     def createTerrainMap(self):
@@ -3075,8 +3664,6 @@ class ContinentMap :
         oldWorldSize = 0
         #biggest continent is automatically 'Old World'
         oldWorldSize += continentList[0].size
-        if mc.ShareContinentIndex == 2:
-            oldWorldContinent = continentList[0]
         del continentList[0]
 
         #If this was the only continent than we have a pangaea. Oh well.
@@ -3096,17 +3683,15 @@ class ContinentMap :
         
         for n in range(len(continentList)):
             oldWorldSize += continentList[0].size
-            if mc.ShareContinent == False:
+	    # Don't delete "new worlds" from the list if we're going to
+            # put everyone on the "old world" continent
+	    if mc.ShareContinent == False:
                 del continentList[0]
             if float(oldWorldSize)/float(totalLand) > 0.60:
                 break
 
-        # add back the biggestNewWorld continent unless we're putting
-        # everyone on the second biggest continent
-        if mc.ShareContinentIndex != 2:
-            continentList.append(biggestNewWorld)
-        else:
-            continentList.append(oldWorldContinent)
+        #add back the biggestNewWorld continent
+        continentList.append(biggestNewWorld)
         
         #what remains in the list will be considered 'New World'
         print ''
@@ -3543,7 +4128,12 @@ class RiverMap :
                 rainFall = self.averageRainfallMap[i]
                 xx = x
                 yy = y
+                loop = 1
                 while(flow != self.L and flow != self.O):
+                    loop += 1
+                    if(loop > 512):
+		        raise ValueError, "Rainfall infinite loop"
+
                     if(flow == self.N):
                         yy += 1
                     elif(flow == self.S):
@@ -3791,8 +4381,7 @@ class BonusPlacer :
             if len(placementList) > 0:
                 placementList = ShuffleList(placementList)
                 for eBonus in placementList:
-                    self.AddBonusType(eBonus,plotIndexList)                        
-                
+                    self.AddBonusType(eBonus,plotIndexList) 
 
         #now check to see that all resources have been placed at least once, this
         #pass ignoring area rules
@@ -4074,7 +4663,7 @@ class BonusPlacer :
             return False
         
         if (bIgnoreArea == False and bonusInfo.isOneArea() == True and
-                 mc.spreadResources == False):
+		mc.spreadResources == False):
             areaID = plot.getArea()
             areaFound = False
             for i in range(len(self.bonusList)):
@@ -5127,7 +5716,7 @@ def getNumCustomMapOptions():
     Return an integer
     """
     mc.initialize()
-    return 6
+    return OPTION_MAX
 	
 def getCustomMapOptionName(argsList):
         """
@@ -5136,18 +5725,28 @@ def getCustomMapOptionName(argsList):
         Return a Unicode string
         """
         optionID = argsList[0]
-        if optionID == 0:
-            return "New World Rules"
-        elif optionID == 1:
-            return "Pangaea Rules"
-        elif optionID == 2:
+        if optionID == OPTION_NewWorld:
+            return "Civ placement"
+        elif optionID == OPTION_Pangaea:
+            return "Pangaea Rule"
+        elif optionID == OPTION_Wrap:
             return "Wrap Option"
-        elif optionID == 3:
-            return "Resources"
-        elif optionID == 4:
-            return "Have bigger maps"
-        elif optionID == 5:
+        elif optionID == OPTION_MapSeed:
             return "Map seed"
+        elif optionID == OPTION_IslandFactor:
+            return "Continent amount"
+        elif optionID == OPTION_Patience:
+            return "Patience amount"
+        elif optionID == OPTION_MapRatio:
+            return "Map ratio"
+        elif optionID == OPTION_Handicap:
+            return "Player bonus resources"
+	elif optionID == OPTION_MapResources:
+	    return "Map resources"
+	elif optionID == OPTION_NoRotate:
+	    return "Wrap land"
+	elif optionID == OPTION_SmoothPeaks:
+	    return "Reduce Mountains"
 
         return u""
 	
@@ -5158,18 +5757,32 @@ def getNumCustomMapOptionValues(argsList):
         Return an integer
         """
         optionID = argsList[0]
-        if optionID == 0:
+        if optionID == OPTION_NewWorld:
+            return 3
+        elif optionID == OPTION_Pangaea:
+            return 2
+        elif optionID == OPTION_Wrap:
             return 4
-        elif optionID == 1:
+        elif optionID == OPTION_MapSeed: # Map world
+            return 7 # Number of possible map seed to choose
+        elif optionID == OPTION_IslandFactor: # Number continents
+            return 4
+        elif optionID == OPTION_Patience: # Speed/quality tradeoff
+	    # Slow but good disabled: Causes infinite loops
             return 2
-        elif optionID == 2:
-            return 3
-        elif optionID == 3:
-            return 3
-        elif optionID == 4:
-            return 3
-        elif optionID == 5:
-            return 2
+        elif optionID == OPTION_MapRatio: # Map ratio
+	    if ALLOW_EXTREME_RATIOS == 1:
+	    	return 8 
+	    else:
+                return 7
+        elif optionID == OPTION_Handicap:
+	    return 4
+	elif optionID == OPTION_MapResources:
+	    return 3
+	elif optionID == OPTION_NoRotate:
+	    return 2
+	elif optionID == OPTION_SmoothPeaks:
+	    return 2
         return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -5181,58 +5794,105 @@ def getCustomMapOptionDescAt(argsList):
     """
     optionID = argsList[0]
     selectionID = argsList[1]
-    if optionID == 0:
+    if optionID == OPTION_NewWorld:
         if selectionID == 0:
-            if mc.AllowNewWorld:
-                return "Start in Old World"
-            else:
-                return "Start Anywhere"
+            return "Keep New World empty"
         elif selectionID == 1:
-            if mc.AllowNewWorld:
-                return "Start Anywhere"
-            else:
-                return "Start in Old World"
-        elif selectionID == 2:
-            return "Everyone on largest landmass"
-        elif selectionID == 3:
-            return "Everyone on 2nd largest land"
-    elif optionID == 1:
+            return "Start anywhere reasonable"
+	elif selectionID == 2:
+	    return "Everyone on same landmass"
+    elif optionID == OPTION_Pangaea:
         if selectionID == 0:
-            if mc.AllowPangeas:
-                return "Allow Pangaeas"
-            else:
-                return "Break Pangaeas"
+            return "Break Pangaeas"
         elif selectionID == 1:
-            if mc.AllowPangeas:
-                return "Break Pangaeas"
-            else:
-                return "Allow Pangaeas"
-    elif optionID == 2:
+            return "Allow Pangaeas"
+    elif optionID == OPTION_Wrap:
         if selectionID == 0:
             return "Cylindrical"
         elif selectionID == 1:
             return "Toroidal"
         elif selectionID == 2:
             return "Flat"
-    elif optionID == 3:
-        if selectionID == 0:
-            return "Full of resources"
-        elif selectionID == 1:
-            return "Resources evenly spread"
-        elif selectionID == 2:
-            return "Like Perfect World"
-    elif optionID == 4:
-        if selectionID == 0:
-            return "Standard size"
-        elif selectionID == 1:
-            return "Big maps"
-        elif selectionID == 2:
-            return "Small maps"
-    elif optionID == 5:
+	elif selectionID == 3:
+	    return "Toric w/ ice band"
+    elif optionID == OPTION_MapSeed:
         if selectionID == 0:
             return "Random"
         elif selectionID == 1:
-            return "Fixed seed"
+            return "Preset #1 (Totestra)"
+        if selectionID == 2:
+            return "Preset #2 (Cephalo)"
+        elif selectionID == 3:
+            return "Preset #3 (Caulixtla)"
+        elif selectionID == 4:
+            return "Preset #4 (En Dotter 1)"
+        elif selectionID == 5:
+            return "Preset #5 (En Dotter 2)"
+        elif selectionID == 6:
+            return "Preset #6 (Atlixco)"
+        else:
+            return "Unknown, using Caulixtla"
+    elif optionID == OPTION_IslandFactor:
+        if selectionID == 0:
+            return "Few (faster)"
+        elif selectionID == 1:
+            return "Some"
+        if selectionID == 2:
+            return "Many"
+        elif selectionID == 3:
+            return "Lots (slow)"
+    elif optionID == OPTION_Patience:
+        if selectionID == -1:
+            return "Not very (Faster mapgen)"
+        elif selectionID == 0:
+            return "A little (faster mapgen)"
+        if selectionID == 1:
+            return "Somewhat"
+        elif selectionID == 2:
+            return "Extremely (nicer map)"
+    elif optionID == OPTION_MapRatio: # Map ratio
+        if selectionID == 0: 
+            return "2:3 (Tall map)" 
+        elif selectionID == 1: 
+            return "1:1 (Square map)"
+        elif selectionID == 2:
+            return "3:2 (Earth-like)"
+        elif selectionID == 3:
+            return "2:1 (Wide map)"
+        elif selectionID == 4:
+            return "7:1 (Ringworld)"
+        elif selectionID == 5:
+            return "3:3 (Big square)"
+        elif selectionID == 6:
+            return "6:4 (Huge earth-like; can be buggy)"
+        elif selectionID == 7: 
+            return "1:2 (BUGGY)" 
+    elif optionID == OPTION_Handicap:
+	if selectionID == 0:
+	    return "None (Player equal to AI)"
+	if selectionID == 1:
+	    return "A little"
+	if selectionID == 2:
+	    return "Some"
+	if selectionID == 3:
+	    return "Lots (Easier for player)"
+    elif optionID == OPTION_MapResources:
+	if selectionID == 0:
+	    return "Like Perfect World"
+	if selectionID == 1:
+	    return "Resources evenly spread"
+	if selectionID == 2:
+	    return "Full of resources"
+    elif optionID == OPTION_NoRotate:
+	if selectionID == 0:
+	    return "Fix continent split"
+	else:
+	    return "PerfectWorld style"
+    elif optionID == OPTION_SmoothPeaks:
+	if selectionID == 0:
+	    return "No"
+	else:
+	    return "Yes"
     return u""
 	
 def getCustomMapOptionDefault(argsList):
@@ -5242,7 +5902,15 @@ def getCustomMapOptionDefault(argsList):
 	Return an integer
 	"""
 	#Always zero in this case
-	return 0
+	#print argsList[0]
+        if argsList[0] == OPTION_Patience:
+            return 1 # Slow speed/good quality (Mark's default)
+	elif argsList[0] == OPTION_MapRatio:
+	    return 2 # 3:2 Earthlike map
+	elif argsList[0] == OPTION_SmoothPeaks:
+	    return 1 # By default, smooth coastal and other peaks
+        else: # Everything else defaults to first choice
+            return 0
     
 def isRandomCustomMapOption(argsList):
 	"""
@@ -5270,23 +5938,19 @@ def normalizeAddExtras():
     return
 def normalizeRemovePeaks():
     return
+GlobalThisIsAdvanced = 0
 def isAdvancedMap():
 	"""
 	Advanced maps only show up in the map script pulldown on the advanced menu.
 	Return 0 if you want your map to show up in the simple singleplayer menu
 	"""
+        GlobalThisIsAdvanced = 1
 	return 0
 def isClimateMap():
-	"""
-	Uses the Climate options
-	"""
 	return 1
 	
 def isSeaLevelMap():
-	"""
-	Uses the Sea Level options
-	"""
-	return 0
+	return 1
     
 def getTopLatitude():
 	"Default is 90. 75 is past the Arctic Circle"
@@ -5305,23 +5969,34 @@ def getGridSize(argsList):
 		WorldSizeTypes.WORLDSIZE_LARGE:		(30,20),
 		WorldSizeTypes.WORLDSIZE_HUGE:		(36,24)
     }
-    # Scale if they want a bigger or smaller world
-    [eWorldSize] = argsList
-    (sizex, sizey) = grid_sizes[eWorldSize]
-    gc = CyGlobalContext()
-    mmap = gc.getMap()
-    if mmap.getCustomMapOption(4) == 1: # Big maps
-        sizex = sizex + int(sizex / 3) 
-        sizey = sizey + int(sizey / 3) 
-    elif mmap.getCustomMapOption(4) == 2: # Small maps
-        sizex = sizex - int(sizex / 3) 
-        sizey = sizey - int(sizey / 3) 
-
     if (argsList[0] == -1): # (-1,) is passed to function on loads
             return []
+    [eWorldSize] = argsList
+
+    (sizex, sizey) = grid_sizes[eWorldSize]
+    # The above values are for a 3:2 ratio.  We also support other ratios
+    base_size = float(sizey) / 2 # base sizes: 3.5, 5, 6.5, 8, 10, 12
+    sizex = int((base_size * mc.ratioX) + 0.5)
+    sizey = int((base_size * mc.ratioY) + 0.5)
+    
+    # Let's reduce ice on smaller maps
+    if(sizey < 20):
+	mc.iceSlope *= 0.85
+    if(sizey < 11):
+	mc.iceSlope *= 0.85
+
+    # The map generator goes in to an infinite loop if the output map is
+    # bigger than (hmWidth, hmHeight)
+    if(sizex > mc.maxMapWidth):
+	sizex = mc.maxMapWidth
+    if(sizey > mc.maxMapHeight):
+	sizey = mc.maxMapHeight
+
+    mc.serviceFlags |= sizey # 21 bits, we have 3 more for other flags
     return (sizex, sizey)
 
 def generatePlotTypes():
+    # Core height map generator
     gc = CyGlobalContext()
     mmap = gc.getMap()
     mc.width = mmap.getGridWidth()
@@ -5336,6 +6011,7 @@ def generatePlotTypes():
     pb.breakPangaeas()
 ##    hm.Erode()
 ##    hm.printHeightMap()
+    hm.rotateMap()
     hm.addWaterBands()
 ##    hm.printHeightMap()
     cm.createClimateMaps()
@@ -5355,6 +6031,7 @@ def generatePlotTypes():
             plotTypes[i] = PlotTypes.PLOT_OCEAN
     print "Finished generating plot types."         
     return plotTypes
+
 def generateTerrainTypes():
     NiTextOut("Generating Terrain  ...")
     print "Adding Terrain"
@@ -5466,6 +6143,7 @@ def placeRiversInPlot(x,y):
             plot.setWOfRiver(True,CardinalDirectionTypes.CARDINALDIRECTION_NORTH)
         elif rm.riverMap[ii] == rm.W:
             plot.setNOfRiver(True,CardinalDirectionTypes.CARDINALDIRECTION_WEST)
+
 '''
 This function examines a lake area and removes ugly surrounding rivers. Any
 river that is flowing away from the lake, or alongside the lake will be
@@ -5530,6 +6208,7 @@ def cleanUpLake(x,y):
     #Southeast plot is not relevant 
             
     return riversIntoLake
+
 '''
 This function replaces rivers to update the river crossings after a lake or
 channel is placed at X,Y. There had been a long standing problem where water tiles
@@ -5876,15 +6555,18 @@ def addFeatures():
                             #print "oasis failed random check"
             
     return
-   
+    
 def createIce():
     gc = CyGlobalContext()
     mmap = gc.getMap()
-    signadded = 0
     featureIce = gc.getInfoTypeForString("FEATURE_ICE")
     iceChance = mc.iceChance
     iceRange = mc.iceRange
     iceSlope = mc.iceSlope
+    signadded = 0 # We add the "Service Tag" sign while drawing ice
+    if(ADD_SERVICE_TAG != 1):
+	signadded = 1 # WARNING: NO SERVICE TAG MEANS NO SUPPORT
+    print "SERVICE TAG: " + mc.serviceString # Always log it, of course
     for y in range(iceRange):
         for x in range(mc.width):
             plot = mmap.plot(x,y)
@@ -5898,13 +6580,16 @@ def createIce():
             if plot != 0 and plot.isWater() == True and PRand.random() < iceChance:
                 plot.setFeatureType(featureIce,0)
                 if signadded == 0:
-                    CyEngine().addSign(plot, -1, str(mc.randomSeed))
-                    signadded = 1
+			CyEngine().addSign(plot, -1, mc.serviceString)
+			print "Sign added at %d %d" % (x,y)
+			signadded = 1
         iceChance *= iceSlope
+    # Make sure the service tag gets added to the map
     if signadded == 0:
-        CyEngine().addSign(plot, -1, str(mc.randomSeed))
-        signadded = 1
-        
+	plot = mmap.plot(0,0)
+	CyEngine().addSign(plot, -1, mc.serviceString)    
+	print "Sign added at 0 0" % (x,y)
+
 def addBonuses():
     bp.AddBonuses()
     return
@@ -5915,8 +6600,8 @@ def assignStartingPlots():
     spf.SetStartingPlots()
 def beforeInit():
     print "Initializing Custom Map Options"
-    mc.initialize()
     mc.initInGameOptions()
+    mc.initialize()
 
 ##mc.initialize()
 ##PRand.seed()
@@ -5948,3 +6633,128 @@ def beforeInit():
 ##rm.printRiverAndTerrainAlign()
 
 ##sm.printHeightMap()
+
+if __name__ == "__main__":
+    IsStandAlone = True
+    import sys
+    mc.UsePythonRandom = True
+    try:
+        arg1 = sys.argv[1]
+        mySeed = arg1
+    except:
+        arg1 = "8939185639133313" # Caulixtla
+        mySeed = "Caulixtla"
+    if(arg1[0:1] == "T"):
+        arg1 = arg1[1:]
+        UseRG32 = True
+    try:
+        mc.totestra = int(arg1)
+    except:
+        mc.totestra = 8939185639133313 # Caulixtla
+    mc.initialize()
+    # This stuff has to be hard coded here
+    mc.width = 144
+    mc.height = 96
+    mc.landPercent = 0.29
+    mc.tropicsLatitude = 23
+    mc.PeakPercent = 0.12
+    mc.HillPercent = 0.35
+    mc.HillChanceAtOne = .50
+    mc.PeakChanceAtOne = .27
+    mc.DesertPercent = 0.20
+    mc.PlainsPercent = 0.42
+    mc.SnowTemp = .30
+    mc.TundraTemp = .35
+    mc.ForestTemp = .50
+    mc.JungleTemp = .7
+    mc.iceChance = 1.0
+    mc.iceRange = 4
+    mc.iceSlope = 0.66
+    if len(sys.argv) <= 2: # Arid map
+        mc.DesertPercent = 0.40
+        mc.PlainsPercent = 0.82
+        mc.iceSlope = 0.33 # Less ice 
+    mc.AllowPangeas = False
+    mc.hmMaxGrain = 2 ** (2 + 2) # Patience is two
+    mc.hmWidth = (mc.hmMaxGrain * 3 * 3)
+    mc.hmHeight =  (mc.hmMaxGrain * 2 * 3) + 1
+    mc.WrapX = True
+    mc.WrapY = False
+    mc.BonusBonus = 1.5 # Full of resources
+    mc.spreadResources = True # Full of resources
+    mc.noRotate = 0
+    mc.smoothPeaks = 1
+    mc.northWaterBand = 10
+    mc.southWaterBand = 10
+    mc.eastWaterBand = 0
+    mc.westWaterBand = 0
+    mc.northCrop = 10
+    mc.southCrop = 10
+    mc.eastCrop = 0
+    mc.westCrop = 0
+    mc.maxMapWidth = int(mc.hmWidth / 4)
+    mc.maxMapHeight = int(mc.hmHeight / 4)
+    mc.hmNumberOfPlates = int(float(mc.hmWidth * mc.hmHeight) * 0.0016)
+
+    mc.minimumMeteorSize = (1 + int(round(float(mc.hmWidth)/float(mc.width)))) * 3
+    mc.patience = 2
+    mc.AllowNewWorld = True
+    mc.ShareContinent = True
+    PRand.seed()
+    hm.performTectonics()
+    hm.generateHeightMap()
+    hm.combineMaps()
+    hm.calculateSeaLevel()
+    hm.fillInLakes()
+    pb.breakPangaeas()
+##    hm.Erode()
+##    hm.printHeightMap()
+    hm.rotateMap()
+    hm.addWaterBands()
+##    hm.printHeightMap()
+    cm.createClimateMaps()
+    sm.initialize()
+    rm.generateRiverMap()
+
+    # Scan the map and give the user a summary of the map
+    floodPlainCount = 0
+    tally = {}
+    bigAM = Areamap(mc.width,mc.height,True,True)
+    bigAM.defineAreas(isNonCoastWaterMatch)
+    maxLandAmount = -1
+    maxLandArea = -1
+    for x in range(mc.width):
+        for y in range(mc.height): 
+            i = (y * mc.width) + x 
+            #area = continentMap.areaMap.areaMap[i]
+            area = bigAM.areaMap[i]
+            if not area in tally:
+                tally[area] = {
+                    "Land": 0,
+                    "Desert": 0, 
+                    "floodPlains": 0, 
+                    "Tundra": 0
+                }
+            if sm.terrainMap[i] != mc.OCEAN and sm.terrainMap[i] != mc.COAST:
+                tally[area]["Land"] += 1
+                if(tally[area]["Land"] > maxLandAmount):
+                    maxLandAmount = tally[area]["Land"]
+                    maxLandArea = area
+            if sm.terrainMap[i] == mc.DESERT:
+                tally[area]["Desert"] += 1
+                if rm.riverMap[i] != 5:
+                    floodPlainCount += 1
+                    tally[area]["floodPlains"] += 1
+            if sm.terrainMap[i] == mc.TUNDRA:
+                tally[area]["Tundra"] += 1
+    print("Flood plain count: " + str(floodPlainCount))
+    for area in tally:
+        print("Tally for continent " + str(area) + ": " + 
+              str(tally[area]))
+    print("Biggest is " + str(maxLandArea) + " with :"+str(tally[maxLandArea]))
+    if(maxLandArea >= 0 and tally[maxLandArea]["Tundra"] < 10 and 
+       tally[maxLandArea]["floodPlains"] > 30 and 
+       tally[maxLandArea]["Desert"] > 500 and
+       tally[maxLandArea]["Land"] > 1000):
+        print("Nice land found seed " + mySeed)
+
